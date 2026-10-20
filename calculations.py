@@ -1,5 +1,6 @@
-import ast, math, re, random
+import ast, math, re, random, statistics
 from fractions import Fraction
+import numpy as np
 
 try:
     import sympy as sp
@@ -120,7 +121,6 @@ def solve_equation(equation_str: str, variable: str = "x"):
     return solutions
 
 def _format_sympy_val(s):
-    """Helper to format SymPy numbers to 4 decimals and clean up complex 'I'"""
     if s.is_real:
         return f"{float(s.evalf()):.4f}"
     else:
@@ -133,35 +133,76 @@ def _format_sympy_val(s):
         return f"{re_str} {sign} {im_str}i"
 
 def solve_linear_system(a, b, c, d, e, f):
-    """Solves ax + by + c = 0 and dx + ey + f = 0"""
     if not HAS_SYMPY: raise ValueError("SymPy missing")
     x, y = sp.symbols('x y')
     try:
-        # We explicitly construct the equations to avoid any parser ambiguity
         eq1 = sp.Eq(a*x + b*y + c, 0)
         eq2 = sp.Eq(d*x + e*y + f, 0)
         sol = sp.solve([eq1, eq2], (x, y))
-        
         if not sol: return "No unique solution"
-        
-        # Format to 4 decimal places
-        x_val = _format_sympy_val(sol[x])
-        y_val = _format_sympy_val(sol[y])
-        return f"x = {x_val}, y = {y_val}"
+        return f"x = {_format_sympy_val(sol[x])}, y = {_format_sympy_val(sol[y])}"
     except Exception as err:
         return f"Error: {err}"
 
 def solve_polynomial(coeffs):
-    """Solves ax^2+bx+c=0 or ax^3+bx^2+cx+d=0"""
     if not HAS_SYMPY: raise ValueError("SymPy missing")
     x = sp.Symbol('x')
     try:
         expr = sum(c * x**i for i, c in enumerate(reversed(coeffs)))
         sols = sp.solve(expr, x)
         if not sols: return "No real solutions"
-        res = []
-        for i, s in enumerate(sols):
-            res.append(f"x{i+1} = {_format_sympy_val(s)}")
+        res = [f"x{i+1} = {_format_sympy_val(s)}" for i, s in enumerate(sols)]
         return " | ".join(res)
     except Exception as err:
         return f"Error: {err}"
+
+# --- Statistics ---
+def get_descriptive_stats(data):
+    if not data: return {}
+    n = len(data)
+    res = {
+        "n (Count)": n,
+        "Sum": sum(data),
+        "Mean": statistics.mean(data),
+        "Min": min(data),
+        "Max": max(data),
+    }
+    if n > 1:
+        res["Median"] = statistics.median(data)
+        res["Var (σ²)"] = statistics.pvariance(data)
+        res["Var (s²)"] = statistics.variance(data)
+        res["Std (σ)"] = statistics.pstdev(data)
+        res["Std (s)"] = statistics.stdev(data)
+        try:
+            q = statistics.quantiles(data, n=4)
+            res["Q1"] = q[0]
+            res["Q3"] = q[2]
+            res["IQR"] = q[2] - q[0]
+        except Exception: pass
+        try:
+            modes = statistics.multimode(data)
+            res["Mode"] = ", ".join(str(m) for m in modes)
+        except Exception: pass
+    return res
+
+def get_regression_stats(x, y):
+    if len(x) != len(y) or len(x) < 2: return {}
+    n = len(x)
+    mean_x, mean_y = statistics.mean(x), statistics.mean(y)
+    cov = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n)) / (n - 1)
+    try: r = statistics.correlation(x, y)
+    except Exception: r = 0.0
+    num = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n))
+    den = sum((x[i] - mean_x)**2 for i in range(n))
+    m = (num / den) if den != 0 else 0
+    b = mean_y - m * mean_x
+    return {
+        "Corr (r)": r,
+        "Slope (m)": m,
+        "Y-Int (b)": b,
+        "Covariance": cov
+    }
+
+# --- Advanced Graph Math ---
+def get_poisson_pmf(k, lam):
+    return (lam**k * np.exp(-lam)) / math.factorial(k)

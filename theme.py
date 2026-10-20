@@ -16,10 +16,10 @@ CURVE_1, CURVE_2, CURVE_3, CURVE_4 = "#829DB0", "#A58AA0", "#B96940", "#7BA05B"
 
 # --- Fonts ---
 FONT_TITLE    = ("Segoe UI", 20, "bold")
-FONT_SUBTITLE = ("Segoe UI", 12)
+FONT_SUBTITLE = ("Segoe UI", 10)
 FONT_DISPLAY  = ("Consolas", 18, "bold")
 FONT_RESULT   = ("Consolas", 28, "bold")
-FONT_KEY      = ("Segoe UI", 13)        # Uniform key font
+FONT_KEY      = ("Segoe UI", 13)
 FONT_HISTORY  = ("Consolas", 11)
 
 # --- Shape / size ---

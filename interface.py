@@ -4,8 +4,9 @@ import theme
 import calculations as calc
 import math
 from keypads import SCIENTIFIC_KEYS, ADVANCED_KEYS
+from statistics_mode import StatisticsFrame
+from graph import GraphFrame
 
-# Increased menu font to match buttons
 MENU_FONT = ("Segoe UI", 16)
 
 class InputWindow(ctk.CTkToplevel):
@@ -43,7 +44,6 @@ class InputWindow(ctk.CTkToplevel):
             vals = [float(e.get().strip()) for e in self.entries]
             res = self.calc_func(*vals)
             
-            # Clear the main input screen
             self.parent_app.expression = ""
             self.parent_app.cursor_pos = 0
             self.parent_app._refresh_display()
@@ -186,6 +186,7 @@ class CalcApp(ctk.CTk):
         self.variables   = {}
         self.history     = []
         self.last_result = None
+        self.previous_view = "sci"
 
         self._build_header()
         self._build_mode_bar()
@@ -215,10 +216,10 @@ class CalcApp(ctk.CTk):
         self._paint_mode_buttons()
 
     def _build_display(self):
-        f = ctk.CTkFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
-        f.pack(fill="x", padx=14, pady=8)
+        self.display_frame = ctk.CTkFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
+        self.display_frame.pack(fill="x", padx=14, pady=8)
         
-        top_row = ctk.CTkFrame(f, fg_color="transparent")
+        top_row = ctk.CTkFrame(self.display_frame, fg_color="transparent")
         top_row.pack(fill="x", padx=12, pady=(6, 0))
         
         self.frac_label = ctk.CTkLabel(top_row, text="S⇔D", font=theme.FONT_SUBTITLE, text_color=theme.TEXT_MUTED, cursor="hand2")
@@ -229,10 +230,10 @@ class CalcApp(ctk.CTk):
         self.mode_label.pack(side="right")
         self.mode_label.bind("<Button-1>", lambda e: self._press("DEG", None))
         
-        self.expr_label = ctk.CTkLabel(f, text=" ", font=theme.FONT_DISPLAY, text_color=theme.TEXT_MUTED, anchor="e")
+        self.expr_label = ctk.CTkLabel(self.display_frame, text=" ", font=theme.FONT_DISPLAY, text_color=theme.TEXT_MUTED, anchor="e")
         self.expr_label.pack(fill="x", padx=12)
         
-        self.result_box = ctk.CTkTextbox(f, height=45, font=theme.FONT_RESULT, fg_color=theme.BG2, text_color=theme.TEXT, wrap="word")
+        self.result_box = ctk.CTkTextbox(self.display_frame, height=45, font=theme.FONT_RESULT, fg_color=theme.BG2, text_color=theme.TEXT, wrap="word")
         self.result_box.pack(fill="x", padx=12, pady=(0, 10))
         self.result_box.insert("end", "0")
         self.result_box.configure(state="disabled")
@@ -246,6 +247,9 @@ class CalcApp(ctk.CTk):
 
     def _build_keypad(self):
         self.keypad_frame = ctk.CTkFrame(self, fg_color=theme.BG1)
+        self.stats_frame = StatisticsFrame(self, self)
+        self.graph_frame = GraphFrame(self, self)
+        
         self.keypad_frame.pack(fill="both", expand=True, padx=14, pady=6)
         self._render_keys()
 
@@ -264,16 +268,29 @@ class CalcApp(ctk.CTk):
                               ).grid(row=r, column=c, padx=3, pady=3, sticky="nsew")
 
     def _build_history(self):
-        f = ctk.CTkFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
-        f.pack(fill="x", padx=14, pady=(0, 12))
-        ctk.CTkLabel(f, text="History", font=theme.FONT_SUBTITLE, text_color=theme.TEXT_MUTED, anchor="w").pack(fill="x", padx=10, pady=(6, 0))
-        self.history_box = ctk.CTkTextbox(f, height=70, font=theme.FONT_HISTORY, fg_color=theme.BG2, text_color=theme.TEXT)
+        self.history_frame = ctk.CTkFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
+        self.history_frame.pack(fill="x", padx=14, pady=(0, 12))
+        ctk.CTkLabel(self.history_frame, text="History", font=theme.FONT_SUBTITLE, text_color=theme.TEXT_MUTED, anchor="w").pack(fill="x", padx=10, pady=(6, 0))
+        self.history_box = ctk.CTkTextbox(self.history_frame, height=70, font=theme.FONT_HISTORY, fg_color=theme.BG2, text_color=theme.TEXT)
         self.history_box.pack(fill="both", expand=True, padx=6, pady=(0, 6))
 
     def _set_mode(self, key):
         self.mode = key
         self._paint_mode_buttons()
-        self._render_keys()
+        
+        self.display_frame.pack_forget()
+        self.keypad_frame.pack_forget()
+        self.history_frame.pack_forget()
+        self.stats_frame.pack_forget()
+        self.graph_frame.pack_forget()
+
+        if key == "stat":
+            self.stats_frame.pack(fill="both", expand=True, padx=14, pady=6)
+        else:
+            self.display_frame.pack(fill="x", padx=14, pady=8)
+            self.keypad_frame.pack(fill="both", expand=True, padx=14, pady=6)
+            self.history_frame.pack(fill="x", padx=14, pady=(0, 12))
+            self._render_keys()
 
     def _paint_mode_buttons(self):
         for k, b in self._mode_btns.items(): b.configure(fg_color=theme.BTN_OP if k == self.mode else theme.BG2)
@@ -289,18 +306,14 @@ class CalcApp(ctk.CTk):
         self.is_fraction = not self.is_fraction
         self.frac_label.configure(text_color=theme.BTN_EQ if self.is_fraction else theme.TEXT_MUTED)
 
-    # --- MENUS ---
     def _show_log_menu(self):
         menu = tk.Menu(self, tearoff=0, bg=theme.BG2, fg=theme.TEXT, font=MENU_FONT, activebackground=theme.BTN_OP, activeforeground=theme.TEXT)
         menu.add_command(label="log₁₀", command=lambda: self._insert_text("log10("))
         menu.add_command(label="log₂", command=lambda: self._insert_text("log2("))
         menu.add_command(label="ln", command=lambda: self._insert_text("ln("))
-        # This now opens the popup window!
         menu.add_command(label="custom base", command=lambda: InputWindow(self, "Log Base", ["x", "base"], calc_log_base))
-        
         try:
-            x = self.winfo_pointerx()
-            y = self.winfo_pointery()
+            x, y = self.winfo_pointerx(), self.winfo_pointery()
             menu.tk_popup(x, y)
         finally:
             menu.grab_release()
@@ -310,10 +323,8 @@ class CalcApp(ctk.CTk):
         menu.add_command(label="2-Variable System", command=lambda: EquationSolverWindow(self, "2-Variable System"))
         menu.add_command(label="Quadratic", command=lambda: EquationSolverWindow(self, "Quadratic"))
         menu.add_command(label="Cubic", command=lambda: EquationSolverWindow(self, "Cubic"))
-        
         try:
-            x = self.winfo_pointerx()
-            y = self.winfo_pointery()
+            x, y = self.winfo_pointerx(), self.winfo_pointery()
             menu.tk_popup(x, y)
         finally:
             menu.grab_release()
@@ -362,7 +373,6 @@ class CalcApp(ctk.CTk):
         
         if label == "log":
             self._show_log_menu(); return
-
         if label == "EQN":
             self._show_eqn_menu(); return
         if label == "nCr":
@@ -410,22 +420,44 @@ class CalcApp(ctk.CTk):
             self.history_box.insert("end", f"{expr} = {value:.6g}\n")
         self.history_box.see("end")
 
+    # --- THE FIX: Ignore keyboard shortcuts if typing in an Entry box ---
+    def _is_typing(self):
+        focused = self.focus_get()
+        return isinstance(focused, (ctk.CTkEntry, tk.Entry))
+
     def _bind_keys(self):
-        self.bind("<Return>",    lambda e: self._press("=", None))
-        self.bind("<BackSpace>", lambda e: self._press("⌫", None))
-        self.bind("<Escape>",    lambda e: self._press("AC", None))
-        self.bind("<Left>",      lambda e: self._press("<", None))
-        self.bind("<Right>",     lambda e: self._press(">", None))
-        for ch in "0123456789.+-*/()%": self.bind(ch, lambda e, c=ch: self._insert_text(c))
-        self.bind("^", lambda e: self._insert_text("**"))
+        self.bind("<Return>",    lambda e: self._press("=", None) if not self._is_typing() else None)
+        self.bind("<BackSpace>", lambda e: self._press("⌫", None) if not self._is_typing() else None)
+        self.bind("<Escape>",    lambda e: self._press("AC", None) if not self._is_typing() else None)
+        self.bind("<Left>",      lambda e: self._press("<", None) if not self._is_typing() else None)
+        self.bind("<Right>",     lambda e: self._press(">", None) if not self._is_typing() else None)
+        
+        for ch in "0123456789.+-*/()%": 
+            self.bind(ch, lambda e, c=ch: self._insert_text(c) if not self._is_typing() else None)
+        self.bind("^", lambda e: self._insert_text("**") if not self._is_typing() else None)
 
-# --- Helper Functions for Popups ---
-def calc_comb(n, r): 
-    return math.comb(int(n), int(r))
+    def _open_graph_view(self, x_data=None, y_data=None):
+        self.previous_view = self.mode
+        
+        self.display_frame.pack_forget()
+        self.keypad_frame.pack_forget()
+        self.history_frame.pack_forget()
+        self.stats_frame.pack_forget()
+        
+        if x_data is not None and y_data is not None:
+            self.graph_frame.load_statistics(x_data, y_data)
+        else:
+            self.graph_frame.load_function_mode()
 
-def calc_perm(n, r): 
-    return math.perm(int(n), int(r))
+        self.graph_frame.pack(fill="both", expand=True, padx=14, pady=6)
 
+    def _close_graph_view(self):
+        self.graph_frame.pack_forget()
+        self._set_mode(self.previous_view)
+
+def calc_comb(n, r): return math.comb(int(n), int(r))
+def calc_perm(n, r): return math.perm(int(n), int(r))
 def calc_log_base(x, base):
-    # Returns formatted result to 4 decimal places
+    if base <= 0 or base == 1 or x <= 0:
+        raise ValueError("Invalid log values")
     return f"{math.log(x, base):.4f}"
