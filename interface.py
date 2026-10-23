@@ -159,7 +159,7 @@ class CalcApp(ctk.CTk):
         self.expr_label = ctk.CTkLabel(self.display_frame, text=" ", font=theme.FONT_DISPLAY, text_color=theme.TEXT_MUTED, anchor="e")
         self.expr_label.pack(fill="x", padx=12)
         
-        self.result_box = ctk.CTkTextbox(self.display_frame, height=45, font=theme.FONT_RESULT, fg_color=theme.BG2, text_color=theme.TEXT, wrap="word")
+        self.result_box = ctk.CTkTextbox(self.display_frame, height=60, font=theme.FONT_RESULT, fg_color=theme.BG2, text_color=theme.TEXT, wrap="word")
         self.result_box.pack(fill="x", padx=12, pady=(0, 10))
         self.result_box.insert("end", "0")
         self.result_box.configure(state="disabled")
@@ -433,7 +433,7 @@ class CalcApp(ctk.CTk):
         self.bind("<Left>",      lambda e: self._press("<", None) if not self._is_typing() else None)
         self.bind("<Right>",     lambda e: self._press(">", None) if not self._is_typing() else None)
         
-        for ch in "0123456789.+-*/()%=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_": 
+        for ch in "0123456789.+-*/()%=!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_": 
             self.bind(ch, lambda e, c=ch: self._insert_text(c) if not self._is_typing() else None)
             
         self.bind("^", lambda e: self._insert_text("**") if not self._is_typing() else None)    
