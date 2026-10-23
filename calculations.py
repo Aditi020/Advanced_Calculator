@@ -1,11 +1,24 @@
 """
 calculations.py
 ---------------
+This is the mathematical "Engine" of the calculator. 
+It contains NO GUI code. It can be tested independently of the app.
+
+Libraries used:
+- ast (Abstract Syntax Tree): Safely parses mathematical strings and prevents malicious code execution.
+- math: Provides standard mathematical functions (sqrt, log, factorial).
+- re (Regular Expressions): Used to find and replace specific text patterns (like "5!").
+- statistics: Standard Python library for calculating mean, median, variance, etc.
+- Fraction: Used to convert decimals into neat fractions (e.g., 0.5 to 1/2).
+- numpy (np): Used for complex array operations and Poisson math.
+- sympy (sp): A symbolic math library used for solving algebra equations (Quadratic, Cubic).
 """
+
 import ast, math, re, random, statistics
 from fractions import Fraction
 import numpy as np
 
+# We try to import SymPy. If the user hasn't installed it, we set a flag so the app doesn't crash.
 try:
     import sympy as sp
     from sympy.parsing.sympy_parser import parse_expr as _sym_parse
@@ -13,9 +26,13 @@ try:
 except ImportError:
     HAS_SYMPY = False
 
-_FACT_RE   = re.compile(r"(\d+(?:\.\d+)?)!")
-_ASSIGN_RE = re.compile(r"^\s*([A-Za-z_]\w*)\s*=\s*(.+)$")
+# Regex (Regular Expression) patterns used to identify specific math patterns in text.
+_FACT_RE   = re.compile(r"(\d+(?:\.\d+)?)!") # Finds factorials like "5!"
+_ASSIGN_RE = re.compile(r"^\s*([A-Za-z_]\w*)\s*=\s*(.+)$") # Finds variable assignments like "a = 5"
 
+# A strict allow-list of Python AST (Abstract Syntax Tree) nodes. 
+# This prevents users from running malicious code like "__import__('os')" inside the calculator.
+# If a math expression contains something not on this list, the calculator throws an error.
 _ALLOWED_NODES = (
     ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
     ast.Name, ast.Load, ast.Call,
@@ -25,9 +42,9 @@ _ALLOWED_NODES = (
 
 def safe_pow(base, exp):
     """
-    NEW: Prevents the app from freezing when calculating massive powers.
-    Example: 9**9**9 crashes Python because the exponent becomes 387,420,489.
-    This function checks the size of the exponent before calculating.
+    FIXED: Prevents the app from freezing when calculating massive powers.
+    Example: 9**9**9 crashes Python because the inner exponent becomes 387,420,489.
+    This function checks the size of the exponent BEFORE calculating.
     """
     if abs(exp) > 10000:
         raise ValueError("Exponent too large")
@@ -40,45 +57,68 @@ def safe_pow(base, exp):
 
 class PowTransformer(ast.NodeTransformer):
     """
-    NEW: Finds the '**' operator in the math expression and replaces it 
-    with our safe_pow() function.
+    FIXED: Finds the '**' operator in the math expression and replaces it 
+    with our safe_pow() function. This intercepts the math BEFORE Python tries to calculate it.
     """
     def visit_BinOp(self, node):
         self.generic_visit(node)
         if isinstance(node.op, ast.Pow):
+            # Replace `a ** b` with `safe_pow(a, b)`
             return ast.Call(func=ast.Name(id='safe_pow', ctx=ast.Load()),
                             args=[node.left, node.right], keywords=[])
         return node
 
 def safe_tan(x, mode="DEG"):
+    """
+    FIXED: Python's math.tan(90) returns a huge number (1.6e16) instead of throwing an error.
+    This function checks if the angle is exactly 90, 270, etc., and raises an "Undefined" error.
+    """
     if mode == "DEG":
+        # Check if the angle (modulo 180) is exactly 90
         if abs((x % 180) - 90) < 1e-9:
-            raise ValueError("Undefined") # <-- Changed to "Undefined"
+            raise ValueError("Undefined") 
         return math.tan(math.radians(x))
     else:
+        # Check if the angle (modulo pi) is exactly pi/2
         if abs((x % math.pi) - (math.pi / 2)) < 1e-9:
-            raise ValueError("Undefined") # <-- Changed to "Undefined"
+            raise ValueError("Undefined")
         return math.tan(x)
 
 def _preprocess(expr: str) -> str:
+    """
+    Converts calculator visual symbols into valid Python math symbols.
+    Example: "5 × 3" becomes "5 * 3", and "2^4" becomes "2**4".
+    """
+    # Replace visual symbols with Python operators
     expr = expr.replace("×", "*").replace("÷", "/")
     expr = expr.replace("−", "-").replace("^", "**")
     
+    # Converts "5!" into "fact(5)" so Python can process it
     while _FACT_RE.search(expr):
         expr = _FACT_RE.sub(r"fact(\1)", expr, count=1)
 
-    # Percentage logic
+    # --- Percentage Logic ---
+    # This handles standard calculator percentage behavior:
+    # 200 + 10% -> 200 + (200 * 10 / 100) = 220
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)%', r'(\1 + \1 * \2 / 100)', expr)
+    # 200 - 10% -> 200 - (200 * 10 / 100) = 180
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)%', r'(\1 - \1 * \2 / 100)', expr)
+    # 200 * 10% -> 200 * (10 / 100) = 20
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*\*\s*(\d+(?:\.\d+)?)%', r'(\1 * \2 / 100)', expr)
+    # 200 / 10% -> 200 / (10 / 100) = 2000
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)%', r'(\1 / (\2 / 100))', expr)
     
     return expr
 
 def _build_namespace(variables: dict, angle_mode: str) -> dict:
+    """
+    Creates a dictionary of allowed math functions the calculator can use.
+    It dynamically switches sin/cos/tan formulas based on Degree or Radian mode.
+    """
     ns = {
         "abs": abs, "fact": math.factorial,
         "sqrt": math.sqrt, 
+        # Custom log function: math.log10 by default, or math.log(x, base)
         "log": lambda x, b=10: math.log10(x) if b == 10 else math.log(x, b), 
         "ln": math.log, "log2": math.log2, "log10": math.log10,
         "sinh": math.sinh, "cosh": math.cosh, "tanh": math.tanh,
@@ -88,6 +128,7 @@ def _build_namespace(variables: dict, angle_mode: str) -> dict:
         "safe_pow": safe_pow # Add our safe power function
     }
     
+    # Adjust sin/cos/tan based on Degree or Radian mode
     if angle_mode == "DEG":
         ns.update({
             "sin": lambda x: math.sin(math.radians(x)),
@@ -102,15 +143,22 @@ def _build_namespace(variables: dict, angle_mode: str) -> dict:
                    "tan": lambda x: safe_tan(x, "RAD"),
                    "asin": math.asin, "acos": math.acos, "atan": math.atan})
         
+    # Add user-defined variables (a=5, b=10) to the allowed namespace
     ns.update(variables)
     return ns
 
 def _safe_eval(expr: str, namespace: dict) -> float:
+    """
+    Uses Python's 'ast' library to safely evaluate math strings.
+    It walks through every part of the equation to ensure no forbidden commands are used.
+    """
     try:
+        # Parse the string into a Python tree structure
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as e:
         raise ValueError(f"Syntax error: {e.msg}")
         
+    # Check every node in the tree against our allowed list
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_NODES):
             raise ValueError(f"Not allowed: {type(node).__name__}")
@@ -122,13 +170,17 @@ def _safe_eval(expr: str, namespace: dict) -> float:
             if node.func.id not in namespace:
                 raise ValueError(f"Unknown function: {node.func.id}")
                 
-    # Apply the safe power transformer
+    # Apply the safe power transformer to prevent freezing
     tree = PowTransformer().visit(tree)
     ast.fix_missing_locations(tree)
                 
+    # Evaluate the string safely with no built-in access
     return eval(compile(tree, "<expr>", "eval"), {"__builtins__": {}}, namespace)
 
 def evaluate(expr: str, variables: dict | None = None, angle_mode: str = "DEG") -> float:
+    """
+    The main math function. Takes a string, preprocesses it, checks safety, and returns the final float value.
+    """
     if not expr.strip():
         raise ValueError("Empty expression")
         
@@ -144,6 +196,10 @@ def evaluate(expr: str, variables: dict | None = None, angle_mode: str = "DEG") 
         raise ValueError("Number too large")
 
 def try_assignment(expr: str, variables: dict, angle_mode: str = "DEG"):
+    """
+    Checks if the user typed a variable assignment (like "x = 10").
+    If so, evaluates the right side and stores it in the variables dictionary.
+    """
     m = _ASSIGN_RE.match(expr)
     if not m:
         return None
@@ -155,23 +211,34 @@ def try_assignment(expr: str, variables: dict, angle_mode: str = "DEG"):
     return value
 
 def format_result(value: float, is_fraction_mode: bool) -> str:
+    """
+    Formats the output. 
+    If is_fraction_mode is TRUE -> Show Fraction (e.g., 6/5)
+    If is_fraction_mode is FALSE -> Show Decimal (e.g., 1.2)
+    """
     if is_fraction_mode:
         try:
+            # 'Fraction' from the fractions library converts 1.2 to 6/5
             frac = Fraction(value).limit_denominator(10000)
             if frac.denominator == 1:
                 return str(frac.numerator)
             return f"{frac.numerator}/{frac.denominator}"
         except Exception:
             pass
+    # Default: Return Decimal formatted to 10 significant digits
     return f"{value:.10g}"
 
-# --- Equation Solvers ---
+# --- Equation Solvers (Powered by SymPy) ---
 def solve_equation(equation_str: str, variable: str = "x"):
+    """
+    Uses SymPy to solve a single string equation (like "x**2 - 4 = 0") and returns the roots.
+    """
     if not HAS_SYMPY: raise ValueError("SymPy missing")
     if "=" not in equation_str: raise ValueError("Equation must contain '='")
     lhs, rhs = equation_str.split("=", 1)
     sym = sp.Symbol(variable)
     try:
+        # sympy.Eq creates an equation object, sp.solve finds the roots
         eq = sp.Eq(_sym_parse(lhs, local_dict={variable: sym}),
                    _sym_parse(rhs, local_dict={variable: sym}))
         solutions = sp.solve(eq, sym)
@@ -182,6 +249,9 @@ def solve_equation(equation_str: str, variable: str = "x"):
     return solutions
 
 def _format_sympy_val(s):
+    """
+    Formats SymPy math objects into neat 4-decimal strings and handles imaginary numbers (like 3 + 2i).
+    """
     if s.is_real:
         return f"{float(s.evalf()):.4f}"
     else:
@@ -194,6 +264,9 @@ def _format_sympy_val(s):
         return f"{re_str} {sign} {im_str}i"
 
 def solve_linear_system(a, b, c, d, e, f):
+    """
+    Uses SymPy to solve 2 equations at once (ax + by + c = 0).
+    """
     if not HAS_SYMPY: raise ValueError("SymPy missing")
     x, y = sp.symbols('x y')
     try:
@@ -206,9 +279,13 @@ def solve_linear_system(a, b, c, d, e, f):
         return f"Error: {err}"
 
 def solve_polynomial(coeffs):
+    """
+    Uses SymPy to solve quadratic or cubic equations based on a list of coefficients.
+    """
     if not HAS_SYMPY: raise ValueError("SymPy missing")
     x = sp.Symbol('x')
     try:
+        # zip coefficients to powers of x (e.g., a*x^2 + b*x^1 + c*x^0)
         expr = sum(c * x**i for i, c in enumerate(reversed(coeffs)))
         sols = sp.solve(expr, x)
         if not sols: return "No real solutions"
@@ -217,8 +294,11 @@ def solve_polynomial(coeffs):
     except Exception as err:
         return f"Error: {err}"
 
-# --- Statistics ---
+# --- Statistics (Powered by Python's `statistics` and `numpy` libraries) ---
 def get_descriptive_stats(data):
+    """
+    Calculates mean, median, variance, std dev, and quartiles for a dataset.
+    """
     if not data: return {}
     n = len(data)
     res = {
@@ -242,17 +322,33 @@ def get_descriptive_stats(data):
     return res
 
 def get_regression_stats(x, y):
+    """
+    Calculates correlation (r), slope (m), intercept (b), and covariance between two datasets.
+    """
     if len(x) != len(y) or len(x) < 2: return {}
     n = len(x)
     mean_x, mean_y = statistics.mean(x), statistics.mean(y)
+    
+    # Covariance formula
     cov = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n)) / (n - 1)
-    try: r = statistics.correlation(x, y)
-    except Exception: r = 0.0
+    
+    try: 
+        r = statistics.correlation(x, y) # Pearson correlation coefficient
+    except Exception: 
+        r = 0.0
+        
+    # Linear Regression formula: y = mx + b
     num = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n))
     den = sum((x[i] - mean_x)**2 for i in range(n))
     m = (num / den) if den != 0 else 0
     b = mean_y - m * mean_x
+    
     return {"Corr (r)": r, "Slope (m)": m, "Y-Int (b)": b, "Covariance": cov}
 
+# --- Advanced Graph Math ---
 def get_poisson_pmf(k, lam):
+    """
+    Poisson Probability Mass Function for a specific k and lambda.
+    Formula: (lambda^k * e^-lambda) / k!
+    """
     return (lam**k * np.exp(-lam)) / math.factorial(k)
