@@ -12,3 +12,6 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+
+# Ignore the generated history file
+history.json

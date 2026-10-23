@@ -1,37 +1,51 @@
+
 """
 theme.py
 --------
-This file acts as the "CSS" for our application. 
-Instead of hardcoding colors and fonts in every file, we define them here once. 
-If we want to change the app from Vanilla & Apricot to Dark Mode, we only change this file.
+Theme: Classic Scientific Calculator
+A professional calculator look with dark casing,
+grey keys, and high-contrast orange operations.
 """
 
-# --- Palette (Vanilla & Apricot Theme) ---
-# These are Hexadecimal color codes.
-BG1        = "#F5EBDD"   # Main background color (Vanilla Cream)
-BG2        = "#FFFCF5"   # Secondary background / Display screen (Warm Ivory)
-BTN_SCI    = "#F8E9BE"   # Scientific buttons (Butter Yellow)
-BTN_OP     = "#E8C5A1"   # Operators & Mode buttons (Soft Caramel)
-BTN_CLEAR  = "#DDA078"   # Clear & Backspace buttons (Apricot)
-BTN_EQ     = "#B96940"   # Equals & Primary actions (Toasted Orange)
-BTN_HOVER  = "#EFE0CC"   # Color when mouse hovers over a button
-TEXT       = "#554337"   # Main text color (Espresso Brown)
-TEXT_LIGHT = "#FFFCF5"   # Text on dark backgrounds
-TEXT_MUTED = "#8A766A"   # Secondary, smaller text
+# --- Palette (Classic Calculator) ---
+
+BG1        = "#202124"   # Main body (Dark Charcoal)
+BG2        = "#303238"   # Display screen (Dark Grey)
+
+BTN_NUM    = "#45474D"   # Number buttons (Calculator Grey)
+BTN_SCI    = "#35383E"   # Scientific function buttons
+BTN_OP     = "#F39C35"   # Operators (Calculator Orange)
+BTN_CLEAR  = "#D94F45"   # Clear buttons (Red)
+BTN_EQ     = "#FFB74D"   # Equals button (Bright Amber)
+
+BTN_HOVER  = "#62656D"   # Button hover (Light Grey)
+TEXT       = "#F5F5F5"   # Primary text (Off White)
+TEXT_LIGHT = "#202124"   # Text on bright buttons
+TEXT_MUTED = "#A5A8AF"   # Secondary text (Muted Grey)
+
 
 # --- Graph Colors ---
-GRAPH_BG, GRAPH_GRID = "#FFFAF0", "#E8DCCB"
-CURVE_1, CURVE_2, CURVE_3, CURVE_4 = "#829DB0", "#A58AA0", "#B96940", "#7BA05B"
+
+GRAPH_BG   = "#191A1D"   # Graph background
+GRAPH_GRID = "#383A40"   # Graph grid lines
+
+CURVE_1    = "#64B5F6"   # Blue
+CURVE_2    = "#CE93D8"   # Purple
+CURVE_3    = "#FFB74D"   # Amber
+CURVE_4    = "#81C784"   # Green
+
 
 # --- Fonts ---
-# The format is ("Font Name", Size, "Style")
+
 FONT_TITLE    = ("Segoe UI", 20, "bold")
 FONT_SUBTITLE = ("Segoe UI", 10)
-FONT_DISPLAY  = ("Consolas", 18, "bold")  # Consolas is a monospace font (like code)
+FONT_DISPLAY  = ("Consolas", 18, "bold")
 FONT_RESULT   = ("Consolas", 28, "bold")
 FONT_KEY      = ("Segoe UI", 13)
-FONT_HISTORY  = ("Consolas", 11)
+FONT_HISTORY  = ("Consolas", 15)
 
-# --- Shape / size ---
-RADIUS, PAD = 10, 6         # Corner radius for buttons and padding size
-WIN_W, WIN_H = 440, 760     # Default window width and height
+
+# --- Shape / Size ---
+
+RADIUS, PAD = 8, 6
+WIN_W, WIN_H = 440, 760
