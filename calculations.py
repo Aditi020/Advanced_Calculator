@@ -53,9 +53,9 @@ def _preprocess(expr: str) -> str:
     # --- NEW: Percentage Logic ---
     # This regex finds any number directly followed by a '%' (e.g., "10%")
     # and replaces it with "(10/100)".
-    expr = re.sub(r'(\d+(?:\.\d+)?)%', r'(\1/100)', expr)
     
-    return expr
+    expr = re.sub(r'(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)%',r'(\1 + \1 * \2 / 100)',expr)      
+    
     
     return expr
 
