@@ -37,7 +37,7 @@ class CalcApp(ctk.CTk):
     """
     def __init__(self):
         super().__init__()
-        self.title("Calc")
+        self.title("Calculator")
         self.geometry(f"{theme.WIN_W}x{theme.WIN_H}")
         self.minsize(380, 640)
         self.configure(fg_color=theme.BG1)
@@ -198,7 +198,7 @@ class CalcApp(ctk.CTk):
     def _build_header(self):
         h = ctk.CTkFrame(self, fg_color=theme.BG1)
         h.pack(fill="x", padx=14, pady=(12, 0))
-        ctk.CTkLabel(h, text="Calc", font=theme.FONT_TITLE, text_color=theme.TEXT).pack(side="left")
+        ctk.CTkLabel(h, text="Calculator", font=theme.FONT_TITLE, text_color=theme.TEXT).pack(side="left")
         ctk.CTkLabel(h, text="SCIENTIFIC & ANALYTICAL", font=theme.FONT_SUBTITLE, text_color=theme.TEXT_MUTED).pack(side="left", padx=10, pady=(8, 0))
 
     def _build_mode_bar(self):
