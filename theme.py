@@ -40,7 +40,7 @@ CURVE_4    = "#81C784"   # Green
 FONT_TITLE    = ("Segoe UI", 20, "bold")
 FONT_SUBTITLE = ("Segoe UI", 10)
 FONT_DISPLAY  = ("Consolas", 18, "bold")
-FONT_RESULT   = ("Consolas", 28, "bold")
+FONT_RESULT   = ("Consolas", 22, "bold")
 FONT_KEY      = ("Segoe UI", 13)
 FONT_HISTORY  = ("Consolas", 15)
 
