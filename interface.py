@@ -362,6 +362,7 @@ class CalcApp(ctk.CTk):
 
     def _refresh_display(self):
         """Updates the expression label, draws the cursor, and shows solver prompts if active."""
+        """Updates the expression label, draws the blinking | cursor, and shows the correct prompts if a Solver is running."""
         if self.solver["active"]:
             self.expr_label.configure(text=self.solver.get("skeleton", ""))
             
@@ -386,15 +387,27 @@ class CalcApp(ctk.CTk):
         self.expr_label.configure(text=text)
 
     def _toggle_frac(self):
+        # 1. Flip the mode
         self.is_fraction = not self.is_fraction
         self.frac_label.configure(text_color=theme.BTN_EQ if self.is_fraction else theme.TEXT_MUTED)
         
+        # 2. Grab what is currently on the screen
         current_val = self.result_box.get("1.0", "end").strip()
+        
+        # 3. If there's a valid number, reformat it
         if current_val and current_val != "0" and "Error" not in current_val:
             try:
-                val = float(current_val)
+                # If the screen shows a fraction (like "1/2"), we use our math engine to calculate it to 0.5 first.
+                if "/" in current_val:
+                    val = calc.evaluate(current_val)
+                else:
+                    # Otherwise, just convert the string to a float
+                    val = float(current_val)
+                    
+                # 4. Display the newly formatted result
                 self._update_result(calc.format_result(val, self.is_fraction), scroll="end")
-            except ValueError:
+            except Exception:
+                # If it's a complex equation result (like "x = 2"), ignore the toggle
                 pass
 
     # ==========================================
