@@ -603,11 +603,7 @@ class CalcApp(ctk.CTk):
         self.history_frame.pack_forget()
         self.stats_frame.pack_forget()
         
-        if x_data is not None and y_data is not None:
-            self.graph_frame.load_statistics(x_data, y_data)
-        else:
-            self.graph_frame.load_function_mode()
-
+        self.graph_frame.load_statistics(x_data, y_data)
         self.graph_frame.pack(fill="both", expand=True, padx=14, pady=6)
 
     def _close_graph_view(self):

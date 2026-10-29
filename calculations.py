@@ -97,8 +97,13 @@ def _preprocess(expr: str) -> str:
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)%', r'(\1 - \1 * \2 / 100)', expr)
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*\*\s*(\d+(?:\.\d+)?)%', r'(\1 * \2 / 100)', expr)
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)%', r'(\1 / (\2 / 100))', expr)
-    
     return expr
+    
+    # 200 + 10%  -> (200 + 200 * 10 / 100)  = 220
+    # 200 - 10%  -> (200 - 200 * 10 / 100)  = 180
+    # 200 * 10%  -> (200 * 10 / 100)        = 20
+    # 200 / 10%  -> (200 / (10 / 100))      = 2000    
+
 
 def _build_namespace(variables: dict, angle_mode: str) -> dict:
     """

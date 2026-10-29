@@ -115,16 +115,12 @@ class GraphFrame(ctk.CTkFrame):
         self.draw()
 
     def draw(self):
-        # Master function that redraws the graph based on the selected type.
         self.setup_axes()
         for w in self.summary_container.winfo_children():
             w.destroy()
             
-        if self.is_stats_mode:
-            self._draw_statistics()
-        else:
-            self._draw_function()
-        self.canvas.draw() # Tells Matplotlib to actually render the changes
+        self._draw_statistics() # Only draw statistics now
+        self.canvas.draw()
 
     def _auto_scale(self, x_data, y_data):
         # Automatically scales the graph so data fits perfectly on screen.
@@ -215,39 +211,6 @@ class GraphFrame(ctk.CTkFrame):
                 self._auto_scale(k_vals, pmf_vals)
                 self._add_summary_row("Lambda (λ)", f"{lam:.4f}")
                 self._add_summary_row("Model", "Poisson Distribution")
-
-    def _draw_function(self):
-        # Plots an equation typed by the user (e.g., y = sin(x))
-        expr = self.func_entry.get().strip()
-        if not expr: return
-        if "=" in expr: expr = expr.split("=")[1].strip()
-            
-        # Generate 1000 X points to draw a smooth curve
-        x_vals = np.linspace(-20, 20, 1000)
-        y_vals = []
-        for x in x_vals:
-            try:
-                val = calc.evaluate(expr, {"x": x}, self.app.angle_mode)
-                if isinstance(val, (int, float, complex)):
-                    y_vals.append(float(val.real) if isinstance(val, complex) else float(val))
-                else:
-                    y_vals.append(np.nan) # np.nan represents "Not a Number" (handles asymptotes)
-            except Exception:
-                y_vals.append(np.nan)
-        
-        y_arr = np.array(y_vals)
-        self.ax.plot(x_vals, y_arr, color=theme.CURVE_1, linewidth=2.5)
-        
-        self._add_summary_row("Equation", f"f(x) = {expr}")
-        self._add_summary_row("Angle Mode", self.app.angle_mode)
-        
-        # Limit Y axis to prevent massive asymptotes (like tan(x)) from ruining the view
-        finite_y = y_arr[np.isfinite(y_arr)]
-        if len(finite_y) > 0:
-            y_med = np.median(finite_y)
-            y_range = max(finite_y) - min(finite_y)
-            self.ax.set_ylim(y_med - y_range*0.8, y_med + y_range*0.8)
-        self.ax.set_xlim(-10, 10)
 
     # --- Interactions ---
     def zoom_in(self): self._apply_zoom(0.8)

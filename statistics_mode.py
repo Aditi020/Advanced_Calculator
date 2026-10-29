@@ -116,7 +116,7 @@ class StatisticsFrame(ctk.CTkFrame):
     def update_summary(self):
         """Updates the read-only textboxes and the live summary card at the bottom."""
         # Update Data Viewers
-        self.view_x.configure(state="normal")
+        self.view_x.configure(state="normal") # allows editing, inserting, and deleting text.
         self.view_x.delete("1.0", "end")
         self.view_x.insert("end", ", ".join(f"{v:g}" for v in self.data_x) if self.data_x else "No X data entered yet.")
         self.view_x.configure(state="disabled")
