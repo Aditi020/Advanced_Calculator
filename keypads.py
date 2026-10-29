@@ -1,14 +1,11 @@
 """
-keypads.py
-----------
 This file stores the layout of the calculator buttons for Scientific and Advanced modes.
-
 Each button is a tuple: (Label, Insert_Text, Style_Color, Cursor_Offset)
 - Label: The text shown on the button.
 - Insert_Text: The text injected into the calculator display. If None, it triggers a special function.
 - Style_Color: Maps to theme.py (num, op, sci, eq, clear).
 - Cursor_Offset: (Optional) How many spaces to move the cursor backwards after typing.
-                 Used for functions like sin(, cos(, sqrt( so the cursor lands INSIDE the bracket.
+- Used for functions like sin(, cos(, sqrt( so the cursor lands INSIDE the bracket.
 """
 # The format is now: (Label, Insert_Text, Style_Color, Cursor_Offset)
 # The brackets are fully closed "()", and the offset moves the cursor back inside.
