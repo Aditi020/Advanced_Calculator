@@ -40,7 +40,7 @@ class CalcApp(ctk.CTk):
 
         # --- Application State ---
         self.mode        = "sci"          # Current mode: "sci", "adv", or "stat"
-        self.expression  = ""             # The math string currently being typed
+        self.expr  = ""             # The math string currently being typed
         self.cursor_pos  = 0              # Where the blinking "|" cursor is placed
         self.angle_mode  = "DEG"          # "DEG" or "RAD"
         self.is_fraction = False          # False = Decimal (1.25), True = Fraction (5/4)
@@ -100,7 +100,7 @@ class CalcApp(ctk.CTk):
             "prompts": prompts,
             "skeleton": skeleton
         }
-        self.expression = ""
+        self.expr = ""
         self.cursor_pos = 0
         self._refresh_display()
         self.update_idletasks()
@@ -115,14 +115,14 @@ class CalcApp(ctk.CTk):
         # If they type '1' and press '=', it routes them to the 2-variable solver.
         if self.solver["type"] == "eqn_menu":
             try:
-                choice = int(self.expression)
+                choice = int(self.expr)
             except ValueError:
                 self._update_result("Error: Enter 1, 2, or 3", scroll="end")
-                self.expression = ""
+                self.expr = ""
                 self._refresh_display()
                 return
             
-            self.expression = ""
+            self.expr = ""
             if choice == 1:
                 self._start_sequence("eqn_2var", ["a", "b", "c", "d", "e", "f"], skeleton="ax + by + c = 0\ndx + ey + f = 0")
             elif choice == 2:
@@ -131,17 +131,17 @@ class CalcApp(ctk.CTk):
                 self._start_sequence("eqn_cubic", ["a", "b", "c", "d"], skeleton="ax³ + bx² + cx + d = 0")
             else:
                 self._update_result("Error: Invalid choice (1-3)", scroll="end")
-                self.expression = ""
+                self.expr = ""
                 self._refresh_display()
             return
 
         # --- STANDARD INPUT CAPTURE ---
         # Now the user is typing a coefficient for a variable (like a=5)
         try:
-            val = calc.evaluate(self.expression, self.variables, self.angle_mode)
+            val = calc.evaluate(self.expr, self.variables, self.angle_mode)
         except Exception:
             self._update_result("Error: Enter a valid number", scroll="end")
-            self.expression = ""
+            self.expr = ""
             return # Do not refresh display so error stays visible
 
         # Convert floats to integers if they are whole numbers (e.g., 1.0 -> 1)
@@ -151,7 +151,7 @@ class CalcApp(ctk.CTk):
             self.solver["data"].append(val)
             
         self.solver["step"] += 1
-        self.expression = ""
+        self.expr = ""
         self.cursor_pos = 0 # Reset cursor when moving to the next variable
         
         # Check if we have collected ALL required numbers
@@ -254,7 +254,7 @@ class CalcApp(ctk.CTk):
             self._mode_btns[key] = b
         self._paint_mode_buttons()
 
-    def _build_display(self):
+    def _build_display(self): 
         self.display_frame = ctk.CTkFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
         self.display_frame.pack(fill="x", padx=14, pady=8)
         
@@ -265,7 +265,7 @@ class CalcApp(ctk.CTk):
         self.frac_label.pack(side="left")
         self.frac_label.bind("<Button-1>", lambda e: self._toggle_frac())
         
-        # Fixed height to prevent the UI from jumping when the skeleton loads
+        # Note: Tkinter UI jumps elsewhere if one don't set a fixed height here. Special note.
         self.expr_label = ctk.CTkLabel(self.display_frame, text=" ", font=theme.FONT_DISPLAY, text_color=theme.TEXT_MUTED, anchor="e", height=45)
         self.expr_label.pack(fill="x", padx=12)
         
@@ -274,7 +274,7 @@ class CalcApp(ctk.CTk):
         self.result_box.insert("end", "0")
         self.result_box.configure(state="disabled")
         
-        # FIX: Prevent the textbox from stealing focus when clicked, otherwise backspace breaks
+        # FIX: Prevent the textbox from stealng focus when clicked. Backspace was breaking.
         self.result_box.bind("<Button-1>", lambda e: "break")
         self.result_box._textbox.configure(takefocus=0)
 
@@ -376,21 +376,21 @@ class CalcApp(ctk.CTk):
                 self.result_box.configure(font=("Consolas", 14, "bold"))
                 menu_text = "1. 2-Variable (x, y)\n2. Quadratic (x)\n3. Cubic (x)"
                 # Scroll to top when nothing is typed. Scroll to bottom when typing.
-                if self.expression == "":
-                    self._update_result(f"{menu_text}\n\n> {self.expression}|", scroll="1.0")
+                if self.expr == "":
+                    self._update_result(f"{menu_text}\n\n> {self.expr}|", scroll="1.0")
                 else:
-                    self._update_result(f"{menu_text}\n\n> {self.expression}|", scroll="end")
+                    self._update_result(f"{menu_text}\n\n> {self.expr}|", scroll="end")
             else:
                 # Font for variable prompts (a = 5)
                 self.result_box.configure(font=("Consolas", 20, "bold"))
                 prompt = self.solver["prompts"][self.solver["step"]]
-                self._update_result(f"{prompt} = {self.expression}|", scroll="end")
+                self._update_result(f"{prompt} = {self.expr}|", scroll="end")
             return
 
         # Normal calculator display logic
         self.result_box.configure(font=theme.FONT_RESULT)
-        text = self.expression or " "
-        if 0 <= self.cursor_pos <= len(self.expression):
+        text = self.expr or " "
+        if 0 <= self.cursor_pos <= len(self.expr):
             text = text[:self.cursor_pos] + "|" + text[self.cursor_pos:]
         self.expr_label.configure(text=text)
 
@@ -433,8 +433,8 @@ class CalcApp(ctk.CTk):
 
     def _insert_text(self, insert):
         # Simply insert the text at the cursor position. 
-        # No smart chaining anymore.
-        self.expression = self.expression[:self.cursor_pos] + insert + self.expression[self.cursor_pos:]
+        # Store the last answer in the variables dictionary so it can be reused via the 'Ans' keyword.
+        self.expr = self.expr[:self.cursor_pos] + insert + self.expr[self.cursor_pos:]
         self.cursor_pos += len(insert)
         self._refresh_display()
 
@@ -446,30 +446,30 @@ class CalcApp(ctk.CTk):
             self.solver["active"] = False
             self.result_box.configure(font=theme.FONT_RESULT)
             self.expr_label.configure(text=" ")
-            self.expression, self.last_result, self.cursor_pos = "", None, 0
+            self.expr, self.last_result, self.cursor_pos = "", None, 0
             self.history_box.delete("1.0", "end")
             self.history = []
             self._save_history()
             self._update_result("0", scroll="end")
             self._refresh_display(); return
         if label == "C":
-            self.expression, self.cursor_pos = "", 0
+            self.expr, self.cursor_pos = "", 0
             self._update_result("0", scroll="end")
             self._refresh_display(); return
         if label == "⌫":
             # Clamp the cursor to the string length to prevent out-of-bounds slicing
-            if self.cursor_pos > len(self.expression):
-                self.cursor_pos = len(self.expression)
+            if self.cursor_pos > len(self.expr):
+                self.cursor_pos = len(self.expr)
                 
             if self.cursor_pos > 0:
-                self.expression = self.expression[:self.cursor_pos-1] + self.expression[self.cursor_pos:]
+                self.expr = self.expr[:self.cursor_pos-1] + self.expr[self.cursor_pos:]
                 self.cursor_pos -= 1
             self._refresh_display(); return
         if label == "<":
             if self.cursor_pos > 0: self.cursor_pos -= 1
             self._refresh_display(); return
         if label == ">":
-            if self.cursor_pos < len(self.expression): self.cursor_pos += 1
+            if self.cursor_pos < len(self.expr): self.cursor_pos += 1
             self._refresh_display(); return
             
         if label == "DEG":
@@ -480,8 +480,8 @@ class CalcApp(ctk.CTk):
             self._refresh_display(); self._render_keys(); return
             
         if label == "+/-":
-            self.expression = f"-({self.expression})"
-            self.cursor_pos = len(self.expression)
+            self.expr = f"-({self.expr})"
+            self.cursor_pos = len(self.expr)
             self._refresh_display(); return
         
         if label == "log":
@@ -512,7 +512,7 @@ class CalcApp(ctk.CTk):
             self._capture_sequence_input()
             return
 
-        expr = self.expression.strip()
+        expr = self.expr.strip()
         if not expr: return
         
         # Try variable assignment first (e.g., "a = 5")
@@ -521,7 +521,7 @@ class CalcApp(ctk.CTk):
             if assigned is not None:
                 self._update_result(calc.format_result(assigned, self.is_fraction), scroll="end")
                 self._record(expr, assigned)
-                self.expression, self.cursor_pos = "", 0
+                self.expr, self.cursor_pos = "", 0
                 self._refresh_display()
                 return
         except Exception:
@@ -534,13 +534,13 @@ class CalcApp(ctk.CTk):
             self._update_result(f"Error: {e}", scroll="end")
             return
             
-        # Store Answer. We don't use smart chaining on operators anymore, 
+        # Store the last answer in the variables dictionary so it can be reused via the 'Ans' keyword.
         # but we keep this so the user can literally type "Ans" on the keyboard to fetch the last result.
         self.variables["Ans"] = value
         self.last_result = value
         self._update_result(calc.format_result(value, self.is_fraction), scroll="end")
         self._record(expr, value)
-        self.expression, self.cursor_pos = "", 0
+        self.expr, self.cursor_pos = "", 0
         self._refresh_display()
 
     def _record(self, expr, value):
