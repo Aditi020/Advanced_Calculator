@@ -1,7 +1,9 @@
 """
-This is the main Controller of the application. 
-It builds the window, handles switching between modes (Scientific, Advanced, Stats, Graph), 
-manages the inline "Solver" prompts (for nCr, EQN, etc.), and binds physical keyboard inputs.
+interface.py
+------------
+This is the main Controller of the application. It builds the window, handles switching 
+between modes (Scientific, Advanced, Stats, Graph), manages the inline "Solver" prompts, 
+and binds physical keyboard inputs.
 
 Key Libraries Used:
 - customtkinter (ctk): For the modern, dark-themed UI widgets.
@@ -111,7 +113,8 @@ class CalcApp(ctk.CTk):
         Captures the number, saves it, and either moves to the next prompt or calculates the final answer.
         """
         # --- SPECIAL CASE: The EQN Menu ---
-        # If we are at the menu screen, pressing '=' means the user selected 1, 2, or 3.
+        # When the user clicks EQN, we show a menu on screen. 
+        # If they type '1' and press '=', it routes them to the 2-variable solver.
         if self.solver["type"] == "eqn_menu":
             try:
                 choice = int(self.expression)
@@ -135,6 +138,7 @@ class CalcApp(ctk.CTk):
             return
 
         # --- STANDARD INPUT CAPTURE ---
+        # Now the user is typing a coefficient for a variable (like a=5)
         try:
             val = calc.evaluate(self.expression, self.variables, self.angle_mode)
         except Exception:
@@ -158,6 +162,7 @@ class CalcApp(ctk.CTk):
             w_type = self.solver["type"]
             w_data = self.solver["data"]
             
+            # Solve the equation based on the collected data
             try:
                 if w_type == "eqn_2var":
                     res = calc.solve_linear_system(*w_data)
@@ -262,7 +267,7 @@ class CalcApp(ctk.CTk):
         self.frac_label.pack(side="left")
         self.frac_label.bind("<Button-1>", lambda e: self._toggle_frac())
         
-        # Fixed height to prevent jumping
+        # Fixed height to prevent the UI from jumping when the skeleton loads
         self.expr_label = ctk.CTkLabel(self.display_frame, text=" ", font=theme.FONT_DISPLAY, text_color=theme.TEXT_MUTED, anchor="e", height=45)
         self.expr_label.pack(fill="x", padx=12)
         
@@ -271,7 +276,7 @@ class CalcApp(ctk.CTk):
         self.result_box.insert("end", "0")
         self.result_box.configure(state="disabled")
         
-        # Prevent mouse clicks from grabbing focus, and stop Tab from focusing it
+        # FIX: Prevent the textbox from stealing focus when clicked, otherwise backspace breaks
         self.result_box.bind("<Button-1>", lambda e: "break")
         self.result_box._textbox.configure(takefocus=0)
 
@@ -281,7 +286,7 @@ class CalcApp(ctk.CTk):
         self.result_box.insert("end", text)
         self.result_box.configure(state="disabled")
         self.result_box.see(scroll)
-        self.focus_set() # Force focus back to the main window
+        self.focus_set() # Force focus back to the main window so keyboard shortcuts work
 
     def _build_keypad(self):
         self.keypad_frame = ctk.CTkFrame(self, fg_color=theme.BG1)
@@ -361,12 +366,15 @@ class CalcApp(ctk.CTk):
                               ).grid(row=r, column=c, padx=3, pady=3, sticky="nsew")
 
     def _refresh_display(self):
-        """Updates the expression label, draws the cursor, and shows solver prompts if active."""
-        """Updates the expression label, draws the blinking | cursor, and shows the correct prompts if a Solver is running."""
+        """
+        Updates the expression label and result box.
+        If a Solver is active, it shows the equation skeleton at the top and the prompt at the bottom.
+        """
         if self.solver["active"]:
             self.expr_label.configure(text=self.solver.get("skeleton", ""))
             
             if self.solver["type"] == "eqn_menu":
+                # Shrink font for the menu so it fits without scrolling
                 self.result_box.configure(font=("Consolas", 14, "bold"))
                 menu_text = "1. 2-Variable (x, y)\n2. Quadratic (x)\n3. Cubic (x)"
                 # Scroll to top when nothing is typed. Scroll to bottom when typing.
@@ -375,11 +383,13 @@ class CalcApp(ctk.CTk):
                 else:
                     self._update_result(f"{menu_text}\n\n> {self.expression}|", scroll="end")
             else:
+                # Font for variable prompts (a = 5)
                 self.result_box.configure(font=("Consolas", 20, "bold"))
                 prompt = self.solver["prompts"][self.solver["step"]]
                 self._update_result(f"{prompt} = {self.expression}|", scroll="end")
             return
 
+        # Normal calculator display logic
         self.result_box.configure(font=theme.FONT_RESULT)
         text = self.expression or " "
         if 0 <= self.cursor_pos <= len(self.expression):
@@ -426,8 +436,17 @@ class CalcApp(ctk.CTk):
     def _insert_text(self, insert):
         # Smart chaining: If expression is empty and user types an operator, start with last_result
         if not self.solver["active"] and insert in ["+", "-", "*", "/", "%", "**", "mod("] and self.expression == "" and self.last_result is not None:
-            self.expression = f"{self.last_result:.10g}"
-            self.cursor_pos = len(self.expression)
+            
+            # FIX: If the user presses '-' and the last result was negative, 
+            # they probably want to type a new negative number, not subtract from the negative answer.
+            # In that case, we don't chain.
+            last_res_negative = self.last_result < 0
+            
+            if insert == "-" and last_res_negative:
+                pass # Don't chain, just let them type a minus sign
+            else:
+                self.expression = f"{self.last_result:.10g}"
+                self.cursor_pos = len(self.expression)
         
         self.expression = self.expression[:self.cursor_pos] + insert + self.expression[self.cursor_pos:]
         self.cursor_pos += len(insert)
@@ -483,6 +502,7 @@ class CalcApp(ctk.CTk):
             self._show_log_menu(); return
             
         if label == "EQN":
+            # Starts the inline equation menu (1. 2-Variable, 2. Quadratic, 3. Cubic)
             self._start_sequence("eqn_menu", ["choice"], skeleton="Select Equation Type")
             return
             
@@ -528,7 +548,9 @@ class CalcApp(ctk.CTk):
             self._update_result(f"Error: {e}", scroll="end")
             return
             
-        # Store Answer for smart chaining
+        # Store Answer for smart chaining. 
+        # Note: We don't have an "Ans" button on the keypad, but we set this variable 
+        # so the user can type "Ans" on their keyboard if they ever need it.
         self.variables["Ans"] = value
         self.last_result = value
         self._update_result(calc.format_result(value, self.is_fraction), scroll="end")
