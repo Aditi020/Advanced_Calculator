@@ -97,20 +97,15 @@ def _preprocess(expr: str) -> str:
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)%', r'(\1 - \1 * \2 / 100)', expr)
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*\*\s*(\d+(?:\.\d+)?)%', r'(\1 * \2 / 100)', expr)
     expr = re.sub(r'(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)%', r'(\1 / (\2 / 100))', expr)
-    return expr
     
-    # 200 + 10%  -> (200 + 200 * 10 / 100)  = 220
-    # 200 - 10%  -> (200 - 200 * 10 / 100)  = 180
-    # 200 * 10%  -> (200 * 10 / 100)        = 20
-    # 200 / 10%  -> (200 / (10 / 100))      = 2000    
-
+    return expr
 
 def _build_namespace(variables: dict, angle_mode: str) -> dict:
     """
     Creates a dictionary of allowed math functions. 
     Dynamically switches sin/cos/tan formulas based on Degree or Radian mode.
     """
-    ns = {
+    namespace = {
         "abs": abs, "fact": math.factorial,
         "sqrt": math.sqrt, 
         "log": lambda x, b=10: math.log10(x) if b == 10 else math.log(x, b), 
@@ -123,7 +118,7 @@ def _build_namespace(variables: dict, angle_mode: str) -> dict:
     }
     
     if angle_mode == "DEG":
-        ns.update({
+        namespace.update({
             "sin": lambda x: math.sin(math.radians(x)),
             "cos": lambda x: math.cos(math.radians(x)),
             "tan": lambda x: safe_tan(x, "DEG"),
@@ -132,12 +127,12 @@ def _build_namespace(variables: dict, angle_mode: str) -> dict:
             "atan": lambda x: math.degrees(math.atan(x)),
         })
     else:
-        ns.update({"sin": math.sin, "cos": math.cos, 
-                   "tan": lambda x: safe_tan(x, "RAD"),
-                   "asin": math.asin, "acos": math.acos, "atan": math.atan})
+        namespace.update({"sin": math.sin, "cos": math.cos, 
+                          "tan": lambda x: safe_tan(x, "RAD"),
+                          "asin": math.asin, "acos": math.acos, "atan": math.atan})
         
-    ns.update(variables)
-    return ns
+    namespace.update(variables)
+    return namespace
 
 def _safe_eval(expr: str, namespace: dict) -> float:
     """
@@ -174,10 +169,10 @@ def evaluate(expr: str, variables: dict | None = None, angle_mode: str = "DEG") 
         raise ValueError("Empty expression")
         
     src = _preprocess(expr)
-    ns  = _build_namespace(variables or {}, angle_mode)
+    namespace  = _build_namespace(variables or {}, angle_mode)
     
     try:
-        result = _safe_eval(src, ns)
+        result = _safe_eval(src, namespace)
         return result
     except ZeroDivisionError:
         raise ValueError("Division by zero")
