@@ -1,10 +1,3 @@
-You are absolutely right. I overshot. A README should be **documentation**, not a diary entry. You want the professional tone of your original README, just with the "AI polish" removed so it reads like a real developer wrote it.
-
-Here is the updated `README.md`. I kept your structure and vocabulary, removed the marketing fluff, and made the setup instructions actually functional.
-
-### `README.md`
-
-```markdown
 # Calc — Scientific & Analytical Calculator
 
 A desktop scientific calculator built with Python. Originally assigned as a basic calculator project, this application was extended into an analytical tool designed for students and data analysts.
@@ -48,7 +41,7 @@ The project uses a modular architecture to separate the UI from the math engine:
 
 ### File Structure
 
-```text
+```
 Calculator/
 ├── main.py                # Entry point to run the app
 ├── theme.py               # Colors, fonts, and styling constants
@@ -94,9 +87,3 @@ Calculator/
 - **Undefined Results:** `math.tan(90)` in Python returns a huge number instead of erroring. The `safe_tan` wrapper intercepts this and raises "Undefined".
 - **Large Powers:** An AST transformer (`PowTransformer`) intercepts the `**` operator and limits the exponent size to prevent the app from freezing on inputs like `9**9**9`.
 - **History:** Calculations are saved to a local `history.json` file. Entries automatically expire after 1 hour. This file is gitignored.
-
-## Author
-
-Aditi Kumar
-NextHikes IT Solutions — Project 2
-```

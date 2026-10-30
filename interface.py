@@ -1,6 +1,4 @@
 """
-interface.py
-------------
 This is the main Controller of the application. It builds the window, handles switching 
 between modes (Scientific, Advanced, Stats, Graph), manages the inline "Solver" prompts, 
 and binds physical keyboard inputs.
@@ -49,7 +47,7 @@ class CalcApp(ctk.CTk):
         
         self.variables   = {}             # Stores variables (e.g., {"a": 5, "b": 10})
         self.history     = []             # List of tuples: (expression, result, timestamp)
-        self.last_result = None           # Stores the previous answer for calculation chaining
+        self.last_result = None           # Stores the previous answer
         self.previous_view = "sci"        # Remembers where to return after closing the Graph
 
         # --- Solver State (For Inline Prompts like nCr, EQN) ---
@@ -434,20 +432,8 @@ class CalcApp(ctk.CTk):
             menu.grab_release()
 
     def _insert_text(self, insert):
-        # Smart chaining: If expression is empty and user types an operator, start with last_result
-        if not self.solver["active"] and insert in ["+", "-", "*", "/", "%", "**", "mod("] and self.expression == "" and self.last_result is not None:
-            
-            # FIX: If the user presses '-' and the last result was negative, 
-            # they probably want to type a new negative number, not subtract from the negative answer.
-            # In that case, we don't chain.
-            last_res_negative = self.last_result < 0
-            
-            if insert == "-" and last_res_negative:
-                pass # Don't chain, just let them type a minus sign
-            else:
-                self.expression = f"{self.last_result:.10g}"
-                self.cursor_pos = len(self.expression)
-        
+        # Simply insert the text at the cursor position. 
+        # No smart chaining anymore.
         self.expression = self.expression[:self.cursor_pos] + insert + self.expression[self.cursor_pos:]
         self.cursor_pos += len(insert)
         self._refresh_display()
@@ -548,9 +534,8 @@ class CalcApp(ctk.CTk):
             self._update_result(f"Error: {e}", scroll="end")
             return
             
-        # Store Answer for smart chaining. 
-        # Note: We don't have an "Ans" button on the keypad, but we set this variable 
-        # so the user can type "Ans" on their keyboard if they ever need it.
+        # Store Answer. We don't use smart chaining on operators anymore, 
+        # but we keep this so the user can literally type "Ans" on the keyboard to fetch the last result.
         self.variables["Ans"] = value
         self.last_result = value
         self._update_result(calc.format_result(value, self.is_fraction), scroll="end")
