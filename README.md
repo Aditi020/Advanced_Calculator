@@ -41,18 +41,23 @@ The project uses a modular architecture to separate the UI from the math engine:
 
 ### File Structure
 
-```
-Calculator/
-├── main.py                # Entry point to run the app
-├── theme.py               # Colors, fonts, and styling constants
-├── calculations.py        # The math engine (no GUI code)
-├── interface.py           # Main window, keyboard bindings, and controller
-├── keypads.py             # Layouts for Scientific and Advanced buttons
-├── statistics_mode.py     # UI and logic for the Statistics workspace
-├── graph.py               # Matplotlib embedding and interactive controls
-├── requirements.txt       # Python dependencies
+```text
+Advanced_Calculator/
+├── code/                  # All Python source files
+│   ├── main.py            # Entry point to run the app
+│   ├── theme.py           # Colors, fonts, and styling constants
+│   ├── calculations.py    # The math engine (no GUI code)
+│   ├── interface.py       # Main window, keyboard bindings, and controller
+│   ├── keypads.py         # Layouts for Scientific and Advanced buttons
+│   ├── statistics_mode.py # UI and logic for the Statistics workspace
+│   ├── graph.py           # Matplotlib embedding and interactive controls
+│   └── requirements.txt   # Python dependencies
+├── docs/                  # Project documentation and presentation
+│   ├── Assignment.pdf     # Original assignment brief
+│   └── Calculator.pptx    # Final presentation slides
+├── .gitignore             # Files to exclude from Git tracking
+├── LICENSE                # Open-source license
 └── README.md              # You are here
-```
 
 ## How to Run
 
@@ -60,29 +65,15 @@ Calculator/
    ```bash
    git clone https://github.com/Aditi020/Advanced_Calculator.git
    cd Advanced_Calculator
-   ```
-
-2. **Create and activate a virtual environment (recommended):**
-   ```bash
-   python -m venv venv
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-3. **Install the dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run the application:**
-   ```bash
+2. Create and activate a virtual environment (recommended):
+   cd code
    python main.py
-   ```
+   # Windows:
+   venv\Scripts\activate
+   # macOS/Linux:
+   source venv/bin/activate
+3. Install the dependencies:
+   pip install -r requirements.txt
+4. Run the application:
+   python main.py
 
-## Technical Notes
-
-- **Security:** The calculator does not use `eval()` directly. It uses Python's `ast` library to whitelist only math operations, preventing code injection.
-- **Undefined Results:** `math.tan(90)` in Python returns a huge number instead of erroring. The `safe_tan` wrapper intercepts this and raises "Undefined".
-- **Large Powers:** An AST transformer (`PowTransformer`) intercepts the `**` operator and limits the exponent size to prevent the app from freezing on inputs like `9**9**9`.
-- **History:** Calculations are saved to a local `history.json` file. Entries automatically expire after 1 hour. This file is gitignored.

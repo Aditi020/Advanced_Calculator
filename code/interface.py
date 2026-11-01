@@ -1,16 +1,7 @@
 """
-This is the main Controller of the application. It builds the window, handles switching 
-between modes (Scientific, Advanced, Stats, Graph), manages the inline "Solver" prompts, 
-and binds physical keyboard inputs.
-
-Key Libraries Used:
-- customtkinter (ctk): For the modern, dark-themed UI widgets.
-- tkinter (tk): Underlying Tkinter used for specific popups (Menus) and window management.
-- json & os: To save and load the calculation history to a local file so it persists across restarts.
-- time: To calculate timestamps for the 1-hour history expiration.
-- matplotlib.pyplot: Imported locally in `on_closing` to cleanly shut down graph memory.
+Main controller. Handles the UI, window switching, and keyboard hooks.
+If the app looks weird, it's probably because tkinter text boxes are stealing focus.
 """
-
 import customtkinter as ctk
 import tkinter as tk
 import theme
@@ -27,10 +18,6 @@ MENU_FONT = ("Segoe UI", 16)
 HISTORY_FILE = "history.json"
 
 class CalcApp(ctk.CTk):
-    """
-    The main application window. 
-    Inherits from CTk (CustomTkinter's main window class).
-    """
     def __init__(self):
         super().__init__()
         self.title("Calculator")
@@ -38,67 +25,54 @@ class CalcApp(ctk.CTk):
         self.minsize(380, 640)
         self.configure(fg_color=theme.BG1)
 
-        # --- Application State ---
-        self.mode        = "sci"          # Current mode: "sci", "adv", or "stat"
-        self.expr  = ""             # The math string currently being typed
-        self.cursor_pos  = 0              # Where the blinking "|" cursor is placed
-        self.angle_mode  = "DEG"          # "DEG" or "RAD"
-        self.is_fraction = False          # False = Decimal (1.25), True = Fraction (5/4)
+        # State vars
+        self.mode = "sci"
+        self.expr = ""
+        self.cursor_pos = 0
+        self.angle_mode = "DEG"
+        self.is_fraction = False
         
-        self.variables   = {}             # Stores variables (e.g., {"a": 5, "b": 10})
-        self.history     = []             # List of tuples: (expression, result, timestamp)
-        self.last_result = None           # Stores the previous answer
-        self.previous_view = "sci"        # Remembers where to return after closing the Graph
+        self.variables = {}
+        self.history = []
+        self.last_result = None
+        self.previous_view = "sci"
+        self._last_enter_t = 0
 
-        # --- Solver State (For Inline Prompts like nCr, EQN) ---
-        # Instead of opening a clunky popup window, the calculator goes into a "Solver" mode.
-        # The display will ask "Enter a:", the user types a number and presses "=".
+        # Used for equation prompts (EQN, nCr)
         self.solver = {
-            "active": False,              # Is the sequence currently running?
-            "type": None,                 # "ncr", "eqn_quad", etc.
-            "step": 0,                    # Which prompt are we currently on?
-            "data": [],                   # Stores the numbers the user has entered so far
-            "prompts": [],                # e.g., ["Enter a", "Enter b", "Enter c"]
-            "skeleton": ""                # The equation text shown at the top (e.g., "ax² + bx + c = 0")
+            "active": False, "type": None, "step": 0,
+            "data": [], "prompts": [], "skeleton": ""
         }
 
-        # --- Build the UI ---
-        self._load_history()              # Load saved history from JSON file
+        self._load_history()
         self._build_header()
         self._build_mode_bar()
         self._build_display()
         self._build_keypad()
         self._build_history()
-        self._bind_keys()                 # Bind physical keyboard events
-        
-        # --- Background Tasks & Close Handling ---
-        self._start_history_cleanup()     # Start the 1-hour expiration timer
-        self.protocol("WM_DELETE_WINDOW", self.on_closing) # Handle the "X" button
+        self._bind_keys()
+        self.bind_all("<Delete>", self._on_delete_key)
+        self._start_history_cleanup()
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def on_closing(self):
-        """Safely closes Matplotlib plots to prevent terminal spam and memory leaks, then closes the app."""
+        # Matplotlib keeps running in bg if we don't close it
         import matplotlib.pyplot as plt
         plt.close('all')
         self.quit()
         self.destroy()
+    def _on_delete_key(self, event):
+        if not self._is_typing():
+            if self.cursor_pos < len(self.expr):
+                self.expr = self.expr[:self.cursor_pos] + self.expr[self.cursor_pos+1:]
+            self._refresh_display()
+            return "break"
 
-    # ==========================================
-    # SOLVER LOGIC (Inline Prompts)
-    # ==========================================
+    # --- Solver Logic ---
     def _start_sequence(self, solver_type, prompts, skeleton=""):
-        """
-        Initializes the solver mode. 
-        :param solver_type: The type of operation (e.g., "eqn_menu", "eqn_quad")
-        :param prompts: List of prompts to show the user (e.g., ["a", "b", "c"])
-        :param skeleton: The equation template shown at the top (e.g., "ax² + bx + c = 0")
-        """
         self.solver = {
-            "active": True,
-            "type": solver_type,
-            "step": 0,
-            "data": [],
-            "prompts": prompts,
-            "skeleton": skeleton
+            "active": True, "type": solver_type, "step": 0,
+            "data": [], "prompts": prompts, "skeleton": skeleton
         }
         self.expr = ""
         self.cursor_pos = 0
@@ -106,13 +80,7 @@ class CalcApp(ctk.CTk):
         self.update_idletasks()
 
     def _capture_sequence_input(self):
-        """
-        Triggered when the user presses '=' while a solver is active. 
-        Captures the number, saves it, and either moves to the next prompt or calculates the final answer.
-        """
-        # --- SPECIAL CASE: The EQN Menu ---
-        # When the user clicks EQN, we show a menu on screen. 
-        # If they type '1' and press '=', it routes them to the 2-variable solver.
+        # If on the main EQN menu (1, 2, or 3)
         if self.solver["type"] == "eqn_menu":
             try:
                 choice = int(self.expr)
@@ -135,16 +103,14 @@ class CalcApp(ctk.CTk):
                 self._refresh_display()
             return
 
-        # --- STANDARD INPUT CAPTURE ---
-        # Now the user is typing a coefficient for a variable (like a=5)
+        # Get the coefficient value
         try:
             val = calc.evaluate(self.expr, self.variables, self.angle_mode)
         except Exception:
             self._update_result("Error: Enter a valid number", scroll="end")
             self.expr = ""
-            return # Do not refresh display so error stays visible
+            return
 
-        # Convert floats to integers if they are whole numbers (e.g., 1.0 -> 1)
         if isinstance(val, float) and val.is_integer():
             self.solver["data"].append(int(val))
         else:
@@ -152,20 +118,19 @@ class CalcApp(ctk.CTk):
             
         self.solver["step"] += 1
         self.expr = ""
-        self.cursor_pos = 0 # Reset cursor when moving to the next variable
+        self.cursor_pos = 0 
         
-        # Check if we have collected ALL required numbers
+        # If we collected all vars, solve
         if self.solver["step"] >= len(self.solver["prompts"]):
             self.solver["active"] = False
             w_type = self.solver["type"]
             w_data = self.solver["data"]
             
-            # Solve the equation based on the collected data
             try:
                 if w_type == "eqn_2var":
-                    res = calc.solve_linear_system(*w_data)
+                    res = calc.solve_2var(*w_data)
                 elif w_type in ["eqn_quad", "eqn_cubic"]:
-                    res = calc.solve_polynomial(w_data)
+                    res = calc.solve_poly(w_data)
                 elif w_type == "ncr":
                     res = str(math.comb(int(w_data[0]), int(w_data[1])))
                 elif w_type == "npr":
@@ -175,28 +140,24 @@ class CalcApp(ctk.CTk):
             except Exception as e:
                 res = f"Error: {e}"
                 
-            # Display the final answer and save to history
             self._update_result(res, scroll="end")
             self._record(f"{w_type}({', '.join(map(str,w_data))})", res)
         
         self._refresh_display()
 
-    # ==========================================
-    # HISTORY MANAGEMENT (JSON Persistence)
-    # ==========================================
+    # --- History ---
     def _load_history(self):
-        """Reads history.json on startup, keeping only entries younger than 1 hour (3600s)."""
         if os.path.exists(HISTORY_FILE):
             try:
                 with open(HISTORY_FILE, "r") as f:
                     saved_history = json.load(f)
-                current_time = time.time()
-                self.history = [item for item in saved_history if current_time - item[2] < 3600]
+                curr_t = time.time()
+                # Only keep last 1 hour
+                self.history = [item for item in saved_history if curr_t - item[2] < 3600]
             except Exception:
                 self.history = []
 
     def _save_history(self):
-        """Writes the current history list to history.json."""
         try:
             with open(HISTORY_FILE, "w") as f:
                 json.dump(self.history, f)
@@ -204,36 +165,29 @@ class CalcApp(ctk.CTk):
             pass
 
     def _start_history_cleanup(self):
-        """Runs every 60 seconds to automatically delete history entries older than 1 hour."""
-        current_time = time.time()
+        curr_t = time.time()
         new_history = []
-        
-        # Filter out old items
         for item in self.history:
             if len(item) == 3:
-                if current_time - item[2] < 3600:
+                if curr_t - item[2] < 3600:
                     new_history.append(item)
             else:
-                new_history.append((item[0], item[1], current_time))
+                new_history.append((item[0], item[1], curr_t))
         
-        # If items were removed, update the file and redraw the visual history box
+        # Redraw if something expired
         if len(new_history) < len(self.history):
             self.history = new_history
             self._save_history()
-            
             self.history_box.delete("1.0", "end")
-            for expr, val, _ in self.history:
-                if isinstance(val, str):
-                    self.history_box.insert("end", f"{expr} -> {val}\n")
+            for e, v, _ in self.history:
+                if isinstance(v, str):
+                    self.history_box.insert("end", f"{e} -> {v}\n")
                 else:
-                    self.history_box.insert("end", f"{expr} = {val:.6g}\n")
+                    self.history_box.insert("end", f"{e} = {v:.6g}\n")
         
-        # Schedule the next cleanup in 60,000 milliseconds (60 seconds)
         self.after(60000, self._start_history_cleanup)
 
-    # ==========================================
-    # UI BUILDING METHODS
-    # ==========================================
+    # --- UI Building ---
     def _build_header(self):
         h = ctk.CTkFrame(self, fg_color=theme.BG1)
         h.pack(fill="x", padx=14, pady=(12, 0))
@@ -254,7 +208,7 @@ class CalcApp(ctk.CTk):
             self._mode_btns[key] = b
         self._paint_mode_buttons()
 
-    def _build_display(self): 
+    def _build_display(self):
         self.display_frame = ctk.CTkFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
         self.display_frame.pack(fill="x", padx=14, pady=8)
         
@@ -265,7 +219,7 @@ class CalcApp(ctk.CTk):
         self.frac_label.pack(side="left")
         self.frac_label.bind("<Button-1>", lambda e: self._toggle_frac())
         
-        # Note: Tkinter UI jumps elsewhere if one don't set a fixed height here. Special note.
+        # Note: Tkinter UI jumps around if you don't set a fixed height here. Took me a while to figure this out.
         self.expr_label = ctk.CTkLabel(self.display_frame, text=" ", font=theme.FONT_DISPLAY, text_color=theme.TEXT_MUTED, anchor="e", height=45)
         self.expr_label.pack(fill="x", padx=12)
         
@@ -284,7 +238,7 @@ class CalcApp(ctk.CTk):
         self.result_box.insert("end", text)
         self.result_box.configure(state="disabled")
         self.result_box.see(scroll)
-        self.focus_set() # Force focus back to the main window so keyboard shortcuts work
+        self.focus_set() # steal focus back to main window
 
     def _build_keypad(self):
         self.keypad_frame = ctk.CTkFrame(self, fg_color=theme.BG1)
@@ -309,12 +263,11 @@ class CalcApp(ctk.CTk):
             if isinstance(val, str):
                 self.history_box.insert("end", f"{expr} -> {val}\n")
             else:
-                self.history_box.insert("end", f"{expr} = {val:.6g}\n")
+                # FIX: Use safe formatting for history loading
+                val_str = calc.fmt_res(val, False)
+                self.history_box.insert("end", f"{expr} = {val_str}\n")
         self.history_box.see("end")
 
-    # ==========================================
-    # MODE & STATE MANAGEMENT
-    # ==========================================
     def _set_mode(self, key):
         self.mode = key
         self._paint_mode_buttons()
@@ -338,7 +291,6 @@ class CalcApp(ctk.CTk):
             b.configure(fg_color=theme.BTN_OP if k == self.mode else theme.BG2)
 
     def _render_keys(self):
-        """Dynamically draws the keypad from keypads.py, highlighting active DEG/RAD."""
         for w in self.keypad_frame.winfo_children(): w.destroy()
         keys = SCIENTIFIC_KEYS if self.mode == "sci" else ADVANCED_KEYS
         
@@ -350,7 +302,6 @@ class CalcApp(ctk.CTk):
                 label, insert, style = key_data[:3]
                 offset = key_data[3] if len(key_data) > 3 else 0
                 
-                # Highlight DEG or RAD if active
                 if label == "DEG" and self.angle_mode == "DEG":
                     bg, fg = theme.BTN_EQ, theme.TEXT_LIGHT
                 elif label == "RAD" and self.angle_mode == "RAD":
@@ -364,30 +315,26 @@ class CalcApp(ctk.CTk):
                               ).grid(row=r, column=c, padx=3, pady=3, sticky="nsew")
 
     def _refresh_display(self):
-        """
-        Updates the expression label and result box.
-        If a Solver is active, it shows the equation skeleton at the top and the prompt at the bottom.
-        """
         if self.solver["active"]:
             self.expr_label.configure(text=self.solver.get("skeleton", ""))
             
             if self.solver["type"] == "eqn_menu":
-                # Shrink font for the menu so it fits without scrolling
                 self.result_box.configure(font=("Consolas", 14, "bold"))
                 menu_text = "1. 2-Variable (x, y)\n2. Quadratic (x)\n3. Cubic (x)"
-                # Scroll to top when nothing is typed. Scroll to bottom when typing.
                 if self.expr == "":
                     self._update_result(f"{menu_text}\n\n> {self.expr}|", scroll="1.0")
                 else:
                     self._update_result(f"{menu_text}\n\n> {self.expr}|", scroll="end")
             else:
-                # Font for variable prompts (a = 5)
                 self.result_box.configure(font=("Consolas", 20, "bold"))
                 prompt = self.solver["prompts"][self.solver["step"]]
-                self._update_result(f"{prompt} = {self.expr}|", scroll="end")
+                text = self.expr or " "
+                if 0 <= self.cursor_pos <= len(self.expr):
+                    text = text[:self.cursor_pos] + "|" + text[self.cursor_pos:]
+                
+                self._update_result(f"{prompt} = {text}", scroll="end")
             return
 
-        # Normal calculator display logic
         self.result_box.configure(font=theme.FONT_RESULT)
         text = self.expr or " "
         if 0 <= self.cursor_pos <= len(self.expr):
@@ -395,32 +342,21 @@ class CalcApp(ctk.CTk):
         self.expr_label.configure(text=text)
 
     def _toggle_frac(self):
-        # 1. Flip the mode
         self.is_fraction = not self.is_fraction
         self.frac_label.configure(text_color=theme.BTN_EQ if self.is_fraction else theme.TEXT_MUTED)
         
-        # 2. Grab what is currently on the screen
         current_val = self.result_box.get("1.0", "end").strip()
-        
-        # 3. If there's a valid number, reformat it
         if current_val and current_val != "0" and "Error" not in current_val:
             try:
-                # If the screen shows a fraction (like "1/2"), we use our math engine to calculate it to 0.5 first.
                 if "/" in current_val:
                     val = calc.evaluate(current_val)
                 else:
-                    # Otherwise, just convert the string to a float
                     val = float(current_val)
-                    
-                # 4. Display the newly formatted result
-                self._update_result(calc.format_result(val, self.is_fraction), scroll="end")
+                self._update_result(calc.fmt_res(val, self.is_fraction), scroll="end")
             except Exception:
-                # If it's a complex equation result (like "x = 2"), ignore the toggle
                 pass
 
-    # ==========================================
-    # INPUT HANDLING & EVALUATION
-    # ==========================================
+    # --- Input Handling ---
     def _show_log_menu(self):
         menu = tk.Menu(self, tearoff=0, bg=theme.BG2, fg=theme.TEXT, font=MENU_FONT, activebackground=theme.BTN_OP, activeforeground=theme.TEXT)
         menu.add_command(label="log₁₀", command=lambda: self._press("log10", "log10()", 1))
@@ -432,7 +368,6 @@ class CalcApp(ctk.CTk):
             menu.grab_release()
 
     def _insert_text(self, insert):
-        # Simply insert the text at the cursor position. 
         # Store the last answer in the variables dictionary so it can be reused via the 'Ans' keyword.
         self.expr = self.expr[:self.cursor_pos] + insert + self.expr[self.cursor_pos:]
         self.cursor_pos += len(insert)
@@ -457,7 +392,6 @@ class CalcApp(ctk.CTk):
             self._update_result("0", scroll="end")
             self._refresh_display(); return
         if label == "⌫":
-            # Clamp the cursor to the string length to prevent out-of-bounds slicing
             if self.cursor_pos > len(self.expr):
                 self.cursor_pos = len(self.expr)
                 
@@ -488,7 +422,6 @@ class CalcApp(ctk.CTk):
             self._show_log_menu(); return
             
         if label == "EQN":
-            # Starts the inline equation menu (1. 2-Variable, 2. Quadratic, 3. Cubic)
             self._start_sequence("eqn_menu", ["choice"], skeleton="Select Equation Type")
             return
             
@@ -515,11 +448,10 @@ class CalcApp(ctk.CTk):
         expr = self.expr.strip()
         if not expr: return
         
-        # Try variable assignment first (e.g., "a = 5")
         try:
-            assigned = calc.try_assignment(expr, self.variables, self.angle_mode)
+            assigned = calc.try_assign(expr, self.variables, self.angle_mode)
             if assigned is not None:
-                self._update_result(calc.format_result(assigned, self.is_fraction), scroll="end")
+                self._update_result(calc.fmt_res(assigned, self.is_fraction), scroll="end")
                 self._record(expr, assigned)
                 self.expr, self.cursor_pos = "", 0
                 self._refresh_display()
@@ -527,18 +459,17 @@ class CalcApp(ctk.CTk):
         except Exception:
             pass
 
-        # Standard math evaluation
         try:
             value = calc.evaluate(expr, self.variables, self.angle_mode)
         except Exception as e:
             self._update_result(f"Error: {e}", scroll="end")
             return
             
-        # Store the last answer in the variables dictionary so it can be reused via the 'Ans' keyword.
-        # but we keep this so the user can literally type "Ans" on the keyboard to fetch the last result.
+        #keeping last_result for the chaining logic
         self.variables["Ans"] = value
+        self.variables["ans"] = value
         self.last_result = value
-        self._update_result(calc.format_result(value, self.is_fraction), scroll="end")
+        self._update_result(calc.fmt_res(value, self.is_fraction), scroll="end")
         self._record(expr, value)
         self.expr, self.cursor_pos = "", 0
         self._refresh_display()
@@ -551,27 +482,25 @@ class CalcApp(ctk.CTk):
         if isinstance(value, str):
             self.history_box.insert("end", f"{expr} -> {value}\n")
         else:
-            self.history_box.insert("end", f"{expr} = {value:.6g}\n")
+            val_str = calc.fmt_res(value, False)
+            self.history_box.insert("end", f"{expr} = {val_str}\n")
+            
         self.history_box.see("end")
 
-    # ==========================================
-    # KEYBOARD BINDINGS
-    # ==========================================
+    # --- Keyboard Hooks ---
     def _is_typing(self):
-        """Checks if the user is currently typing inside a text entry box."""
         focused = self.focus_get()
         return isinstance(focused, (ctk.CTkEntry, tk.Entry))
 
     def _bind_keys(self):
-        # bind_all ensures the root window catches the event EVEN IF a widget has focus.
         self.bind_all("<Return>", self._on_return)
         self.bind_all("<BackSpace>", self._on_backspace)
         self.bind_all("<Escape>", self._on_escape)
         self.bind_all("<Left>", self._on_left)
         self.bind_all("<Right>", self._on_right)
         self.bind_all("<Key>", self._on_key)
-        
-        # Bind directly to the internal Tkinter text widgets to override their default behavior
+
+        # Bind directly to the internal text widgets so they don't swallow backspace
         self.result_box._textbox.bind("<BackSpace>", self._on_backspace)
         self.result_box._textbox.bind("<Return>", self._on_return)
         self.history_box._textbox.bind("<BackSpace>", self._on_backspace)
@@ -579,8 +508,15 @@ class CalcApp(ctk.CTk):
 
     def _on_return(self, event):
         if not self._is_typing():
-            self._press("=", None)
-            return "break" # Stops the event from propagating to text boxes
+            curr_t = time.time()
+            # If Enter is pressed twice quickly (within 0.4s), act as Clear (C)
+            if curr_t - self._last_enter_t < 0.4:
+                self._press("C", None)
+                self._last_enter_t = 0 # Reset the timer
+            else:
+                self._press("=", None)
+                self._last_enter_t = curr_t
+            return "break"  
 
     def _on_backspace(self, event):
         if not self._is_typing():
@@ -613,9 +549,7 @@ class CalcApp(ctk.CTk):
                 self._insert_text("**")
                 return "break"
 
-    # ==========================================
-    # GRAPH MODE ROUTING
-    # ==========================================
+    # --- Graph Routing ---
     def _open_graph_view(self, x_data=None, y_data=None):
         self.previous_view = self.mode
         self.display_frame.pack_forget()

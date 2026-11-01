@@ -1,6 +1,6 @@
 """
-This file builds the UI and handles the logic for the "Statistics" tab.
-It allows the user to input datasets (X and Y) and dynamically updates a summary card.
+Stats tab UI.
+Takes datasets, calculates the metrics, and updates the summary card.
 """
 
 import customtkinter as ctk
@@ -9,32 +9,30 @@ import calculations as calc
 
 class StatisticsFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
-        # parent: the main window, app: the main CalcApp instance
         super().__init__(parent, fg_color=theme.BG1)
         self.app = app
-        self.data_x = [] # Stores the X dataset in memory
-        self.data_y = [] # Stores the Y dataset in memory
+        self.data_x = [] 
+        self.data_y = [] 
         
-        # --- 1. Data Entry Area ---
+        # Inputs Area
         entry_frame = ctk.CTkFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
         entry_frame.pack(fill="x", padx=14, pady=(0, 6))
         
-        # X Input Row
+        # X Input
         row_x = ctk.CTkFrame(entry_frame, fg_color="transparent")
         row_x.pack(fill="x", padx=10, pady=(10, 5))
         ctk.CTkLabel(row_x, text="Data (X):", font=theme.FONT_KEY, text_color=theme.TEXT).pack(side="left")
         self.entry_x = ctk.CTkEntry(row_x, font=theme.FONT_KEY, fg_color=theme.BG1, text_color=theme.TEXT)
         self.entry_x.pack(side="left", fill="x", expand=True, padx=10)
-        self.entry_x.bind("<Return>", lambda e: self.add_x()) # Pressing Enter adds the data
+        self.entry_x.bind("<Return>", lambda e: self.add_x())
         ctk.CTkButton(row_x, text="Add", width=50, fg_color=theme.BTN_OP, text_color=theme.TEXT, command=self.add_x).pack(side="right")
         
-        # X Viewer (Read-only textbox)
         self.view_x = ctk.CTkTextbox(entry_frame, height=30, font=theme.FONT_HISTORY, fg_color=theme.BG1, text_color=theme.TEXT_MUTED, wrap="word")
         self.view_x.pack(fill="x", padx=10, pady=(0, 10))
         self.view_x.insert("end", "No X data entered yet.")
         self.view_x.configure(state="disabled")
         
-        # Y Input Row
+        # Y Input
         row_y = ctk.CTkFrame(entry_frame, fg_color="transparent")
         row_y.pack(fill="x", padx=10, pady=(0, 5))
         ctk.CTkLabel(row_y, text="Data (Y):", font=theme.FONT_KEY, text_color=theme.TEXT).pack(side="left")
@@ -43,28 +41,25 @@ class StatisticsFrame(ctk.CTkFrame):
         self.entry_y.bind("<Return>", lambda e: self.add_y())
         ctk.CTkButton(row_y, text="Add", width=50, fg_color=theme.BTN_OP, text_color=theme.TEXT, command=self.add_y).pack(side="right")
 
-        # Y Viewer
         self.view_y = ctk.CTkTextbox(entry_frame, height=30, font=theme.FONT_HISTORY, fg_color=theme.BG1, text_color=theme.TEXT_MUTED, wrap="word")
         self.view_y.pack(fill="x", padx=10, pady=(0, 10))
         self.view_y.insert("end", "No Y data entered yet (Optional).")
         self.view_y.configure(state="disabled")
 
-        # --- 2. Single-line Output for Stats Buttons ---
+        # Output text
         self.output_label = ctk.CTkLabel(self, text="", font=theme.FONT_RESULT, text_color=theme.BTN_EQ)
         self.output_label.pack(pady=(0, 5))
 
-        # --- 3. Function Buttons ---
+        # Function Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=14, pady=6)
         
-        # Map button text to their respective functions
         buttons = [
             ("Q1", self.show_q1), ("Q3", self.show_q3), ("IQR", self.show_iqr), ("MAD", self.show_mad),
             ("Samp Var", self.show_vars), ("Pop Var", self.show_varp), ("Std (σ)", self.show_stdp), ("Clear All", self.clear_all),
             ("Corr (r)", self.show_r), ("Slope (m)", self.show_m), ("Y-Int (b)", self.show_b)
         ]
         
-        # Place buttons in a 4-column grid
         for i, (label, cmd) in enumerate(buttons):
             r, c = divmod(i, 4)
             btn_frame.grid_columnconfigure(c, weight=1)
@@ -72,18 +67,19 @@ class StatisticsFrame(ctk.CTkFrame):
             ctk.CTkButton(btn_frame, text=label, font=theme.FONT_KEY, fg_color=fg, text_color=theme.TEXT, 
                           hover_color=theme.BTN_HOVER, corner_radius=theme.RADIUS, command=cmd).grid(row=r, column=c, padx=3, pady=3, sticky="ew")
 
-        # Graph button spans across all 4 columns
         ctk.CTkButton(btn_frame, text="📈 View Graph", font=theme.FONT_KEY, fg_color=theme.BTN_EQ, text_color=theme.TEXT_LIGHT, 
                       hover_color=theme.BTN_HOVER, corner_radius=theme.RADIUS, command=self.show_graph).grid(row=3, column=0, columnspan=4, padx=3, pady=(6, 3), sticky="ew")
 
-        # --- 4. Live Summary ---
+        # Summary Card
         self.summary_frame = ctk.CTkScrollableFrame(self, fg_color=theme.BG2, corner_radius=theme.RADIUS)
         self.summary_frame.pack(fill="both", expand=True, padx=14, pady=(6, 10))
         
         self.update_summary()
 
     def parse_input(self, text):
-        """Converts a string like '1, 2, 3' or '1 2 3' into a list of floats: [1.0, 2.0, 3.0]"""
+        """
+        Parses comma or space separated values into a list of floats.
+        """
         text = text.replace(",", " ")
         return [float(x) for x in text.split() if x.strip()]
 
@@ -91,9 +87,9 @@ class StatisticsFrame(ctk.CTkFrame):
         try:
             vals = self.parse_input(self.entry_x.get())
             if vals:
-                self.data_x.extend(vals) # Add to existing list
-                self.entry_x.delete(0, "end") # Clear input box
-                self.update_summary() # Refresh UI
+                self.data_x.extend(vals)
+                self.entry_x.delete(0, "end")
+                self.update_summary()
         except ValueError:
             self.output_label.configure(text="Error: Invalid X input")
 
@@ -114,9 +110,10 @@ class StatisticsFrame(ctk.CTkFrame):
         self.update_summary()
 
     def update_summary(self):
-        """Updates the read-only textboxes and the live summary card at the bottom."""
-        # Update Data Viewers
-        self.view_x.configure(state="normal") # allows editing, inserting, and deleting text.
+        """
+        Updates the read-only data viewers and rebuilds the summary card.
+        """
+        self.view_x.configure(state="normal")
         self.view_x.delete("1.0", "end")
         self.view_x.insert("end", ", ".join(f"{v:g}" for v in self.data_x) if self.data_x else "No X data entered yet.")
         self.view_x.configure(state="disabled")
@@ -126,7 +123,6 @@ class StatisticsFrame(ctk.CTkFrame):
         self.view_y.insert("end", ", ".join(f"{v:g}" for v in self.data_y) if self.data_y else "No Y data entered yet (Optional).")
         self.view_y.configure(state="disabled")
 
-        # Clear old summary
         for w in self.summary_frame.winfo_children():
             w.destroy()
 
@@ -137,26 +133,22 @@ class StatisticsFrame(ctk.CTkFrame):
             ctk.CTkLabel(self.summary_frame, text="Enter data to see results.", font=theme.FONT_KEY, text_color=theme.TEXT_MUTED).pack(pady=20)
             return
 
-        # Build Data X Summary
         if has_x:
-            x_stats = calc.get_descriptive_stats(self.data_x)
+            x_stats = calc.get_desc_stats(self.data_x)
             core_x_keys = ["n (Count)", "Mean", "Median", "Std (s)"]
             core_x = {k: x_stats[k] for k in core_x_keys if k in x_stats}
             self._build_summary_card("📊 Data X Overview", core_x)
             
-        # Build Data Y Summary
         if has_y:
             ctk.CTkFrame(self.summary_frame, height=10, fg_color="transparent").pack()
-            y_stats = calc.get_descriptive_stats(self.data_y)
+            y_stats = calc.get_desc_stats(self.data_y)
             core_y_keys = ["n (Count)", "Mean", "Median", "Std (s)"]
             core_y = {k: y_stats[k] for k in core_y_keys if k in y_stats}
             self._build_summary_card("📊 Data Y Overview", core_y)
 
     def _build_summary_card(self, title, stats_dict):
-        """Helper to draw a pretty summary card for a dictionary of stats."""
         ctk.CTkLabel(self.summary_frame, text=title, font=("Segoe UI", 15, "bold"), text_color=theme.TEXT, anchor="w").pack(fill="x", pady=(5, 2))
         for key, val in stats_dict.items():
-            # Format floats to 4 decimals, strings stay as strings
             val_str = f"{val:.4f}" if isinstance(val, float) else str(val)
             row = ctk.CTkFrame(self.summary_frame, fg_color="transparent")
             row.pack(fill="x", pady=1)
@@ -164,15 +156,13 @@ class StatisticsFrame(ctk.CTkFrame):
             ctk.CTkLabel(row, text=val_str, font=("Segoe UI", 14, "bold"), text_color=theme.TEXT, anchor="e").pack(side="right", padx=10)
 
     def _get_stat(self, key, is_reg=False):
-        """Fetches a specific stat and displays it in the output_label."""
         if is_reg:
-            data = calc.get_regression_stats(self.data_x, self.data_y)
+            data = calc.get_reg_stats(self.data_x, self.data_y)
         else:
-            data = calc.get_descriptive_stats(self.data_x)
+            data = calc.get_desc_stats(self.data_x)
             
         val = data.get(key)
         if val is not None:
-            # Mode returns a string, numbers return floats
             if isinstance(val, (int, float)):
                 self.output_label.configure(text=f"{key} = {val:.4f}")
             else:
