@@ -117,7 +117,7 @@ def _build_ns(vars, angle):
     Creates the dictionary of functions the evaluator can use.
     Changes trig functions depending on DEG or RAD mode.
     """
-    ns = {
+    nmspace = {
         "abs": abs, "fact": safe_fact, "safe_fact": safe_fact, "sqrt": math.sqrt, 
         "log": lambda x, b=10: math.log10(x) if b == 10 else math.log(x, b), 
         "ln": math.log, "log2": math.log2, "log10": math.log10,
@@ -129,7 +129,7 @@ def _build_ns(vars, angle):
     }
     
     if angle == "DEG":
-        ns.update({
+        nmspaceupdate({
             "sin": lambda x: math.sin(math.radians(x)),
             "cos": lambda x: math.cos(math.radians(x)),
             "tan": lambda x: safe_tan(x, "DEG"),
@@ -138,11 +138,11 @@ def _build_ns(vars, angle):
             "atan": lambda x: math.degrees(math.atan(x)),
         })
     else:
-        ns.update({"sin": math.sin, "cos": math.cos, 
+        nmspaceupdate({"sin": math.sin, "cos": math.cos, 
                    "tan": lambda x: safe_tan(x, "RAD"),
                    "asin": math.asin, "acos": math.acos, "atan": math.atan})
         
-    ns.update(vars)
+    nmspaceupdate(vars)
     return ns
 
 def _safe_eval(s, ns):
@@ -203,7 +203,7 @@ def try_assign(s, vars, angle="DEG"):
     vars[name] = val
     return val
 
-def fmt_res(val, is_frac):
+def frmt_res(val, is_frac):
     """
     Formats the output to fraction or decimal based on the S<->D toggle.
     """
@@ -224,7 +224,7 @@ def fmt_res(val, is_frac):
         return s
 
 # --- Sympy Equation Solvers ---
-def _fmt_sympy(s):
+def _frmt_sympy(s):
     """
     Handles complex numbers like 3+2i when formatting Sympy outputs.
     """
@@ -265,7 +265,7 @@ def solve_2var(a, b, c, d, e, f):
         # If both x and y are solved, we have a unique solution.
         # If x is solved y like , x: -y, then it's dependent.
         if isinstance(sol, dict) and x in sol and y in sol:
-            return f"x = {_fmt_sympy(sol[x])}, y = {_fmt_sympy(sol[y])}"
+            return f"x = {_frmt_sympy(sol[x])}, y = {_frmt_sympy(sol[y])}"
             
         return "Infinitely many solutions"
     except Exception as err:
@@ -287,7 +287,7 @@ def solve_poly(coeffs):
         if not sols: 
             return "No real solutions"
             
-        res = [f"x{i+1} = {_fmt_sympy(s)}" for i, s in enumerate(sols)]
+        res = [f"x{i+1} = {_frmt_sympy(s)}" for i, s in enumerate(sols)]
         return " | ".join(res)
     except Exception as err:
         return f"Error: {err}"

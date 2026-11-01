@@ -36,7 +36,7 @@ class CalcApp(ctk.CTk):
         self.history = []
         self.last_result = None
         self.previous_view = "sci"
-        self._last_enter_t = 0
+        self._sec_enter_ = 0
 
         # Used for equation prompts (EQN, nCr)
         self.solver = {
@@ -264,7 +264,7 @@ class CalcApp(ctk.CTk):
                 self.history_box.insert("end", f"{expr} -> {val}\n")
             else:
                 # FIX: Use safe formatting for history loading
-                val_str = calc.fmt_res(val, False)
+                val_str = calc.frmt_res(val, False)
                 self.history_box.insert("end", f"{expr} = {val_str}\n")
         self.history_box.see("end")
 
@@ -352,7 +352,7 @@ class CalcApp(ctk.CTk):
                     val = calc.evaluate(current_val)
                 else:
                     val = float(current_val)
-                self._update_result(calc.fmt_res(val, self.is_fraction), scroll="end")
+                self._update_result(calc.frmt_res(val, self.is_fraction), scroll="end")
             except Exception:
                 pass
 
@@ -451,7 +451,7 @@ class CalcApp(ctk.CTk):
         try:
             assigned = calc.try_assign(expr, self.variables, self.angle_mode)
             if assigned is not None:
-                self._update_result(calc.fmt_res(assigned, self.is_fraction), scroll="end")
+                self._update_result(calc.frmt_res(assigned, self.is_fraction), scroll="end")
                 self._record(expr, assigned)
                 self.expr, self.cursor_pos = "", 0
                 self._refresh_display()
@@ -469,7 +469,7 @@ class CalcApp(ctk.CTk):
         self.variables["Ans"] = value
         self.variables["ans"] = value
         self.last_result = value
-        self._update_result(calc.fmt_res(value, self.is_fraction), scroll="end")
+        self._update_result(calc.frmt_res(value, self.is_fraction), scroll="end")
         self._record(expr, value)
         self.expr, self.cursor_pos = "", 0
         self._refresh_display()
@@ -482,7 +482,7 @@ class CalcApp(ctk.CTk):
         if isinstance(value, str):
             self.history_box.insert("end", f"{expr} -> {value}\n")
         else:
-            val_str = calc.fmt_res(value, False)
+            val_str = calc.frmt_res(value, False)
             self.history_box.insert("end", f"{expr} = {val_str}\n")
             
         self.history_box.see("end")
@@ -510,12 +510,12 @@ class CalcApp(ctk.CTk):
         if not self._is_typing():
             curr_t = time.time()
             # If Enter is pressed twice quickly (within 0.4s), act as Clear (C)
-            if curr_t - self._last_enter_t < 0.4:
+            if curr_t - self._sec_enter_ < 0.4:
                 self._press("C", None)
-                self._last_enter_t = 0 # Reset the timer
+                self._sec_enter_ = 0 # Reset the timer
             else:
                 self._press("=", None)
-                self._last_enter_t = curr_t
+                self._sec_enter_ = curr_t
             return "break"  
 
     def _on_backspace(self, event):
